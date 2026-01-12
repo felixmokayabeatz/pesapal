@@ -9,3 +9,4 @@ local.py
 staticfiles/
 reminders.log
 /logs
+db.pesapal
