@@ -487,3 +487,89 @@ Special:
                     constr.append("NOT NULL")
                 constr_str = f" ({', '.join(constr)})" if constr else ""
                 print(f"  {col['name']}: {col['type']}{constr_str}")
+
+
+
+    def save_to_file(self, filename="db.pesapal"):
+        """Save entire database to a file"""
+        import pickle
+        
+        data = {
+            'name': self.name,
+            'tables': {}
+        }
+        
+        for table_name, table in self.tables.items():
+            # Get table data
+            table_data = {
+                'columns': [],
+                'rows': table.rows,
+                'row_count': table.row_count
+            }
+            
+            # Save column definitions
+            for col in table.columns:
+                table_data['columns'].append({
+                    'name': col.name,
+                    'data_type': col.data_type,
+                    'is_primary': col.is_primary,
+                    'is_unique': col.is_unique,
+                    'nullable': col.nullable
+                })
+            
+            data['tables'][table_name] = table_data
+        
+        # Save to file
+        with open(filename, 'wb') as f:
+            pickle.dump(data, f)
+        
+        print(f"✓ Database saved to {filename}")
+    
+    def load_from_file(self, filename="db.pesapal"):
+        """Load database from file"""
+        import pickle
+        import os
+        
+        if not os.path.exists(filename):
+            print(f"✗ File {filename} not found")
+            return False
+        
+        try:
+            with open(filename, 'rb') as f:
+                data = pickle.load(f)
+            
+            self.name = data['name']
+            self.tables = {}
+            
+            for table_name, table_data in data['tables'].items():
+                # Recreate table
+                table = Table(table_name)
+                
+                # Recreate columns
+                for col_data in table_data['columns']:
+                    column = Column(
+                        name=col_data['name'],
+                        data_type=col_data['data_type'],
+                        is_primary=col_data['is_primary'],
+                        is_unique=col_data['is_unique'],
+                        nullable=col_data['nullable']
+                    )
+                    table.add_column(column)
+                
+                # Restore rows
+                table.rows = table_data['rows']
+                table.row_count = table_data['row_count']
+                
+                # Rebuild indexes
+                for col in table.columns:
+                    if col.is_primary or col.is_unique:
+                        table.create_index(col.name)
+                
+                self.tables[table_name] = table
+            
+            print(f"✓ Database loaded from {filename}")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error loading database: {e}")
+            return False
