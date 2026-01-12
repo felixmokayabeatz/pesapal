@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/query/', views.api_query, name='api_query'),
     path('api/schema/', views.api_schema, name='api_schema'),
     path('join/', views.run_join, name='join_demo'),
+    path('terminal/', views.web_terminal, name='terminal'),
 ]
