@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JOIN Demo</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
+        .error { color: red; padding: 20px; background: #ffe6e6; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JOIN Operation Demo</h1>
+        <a href="/" class="btn">Home</a>
+        
+        {% if error %}
+        <div class="error">
+            <h3>Error:</h3>
+            <p>{{ error }}</p>
+            <p>Try creating orders table first in the REPL:</p>
+            <pre>CREATE TABLE orders (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    product_id INTEGER,
+    quantity INTEGER,
+    order_date TEXT
+)</pre>
+        </div>
+        {% else %}
+        <h3>Users JOIN Orders</h3>
+        <p>Showing users and their orders:</p>
+        
+        <table>
+            <tr>
+                <th>User Name</th>
+                <th>Order ID</th>
+                <th>Quantity</th>
+                <th>Order Date</th>
+            </tr>
+            {% for row in results %}
+            <tr>
+                <td>{{ row.users.name }}</td>
+                <td>{{ row.orders.id }}</td>
+                <td>{{ row.orders.quantity }}</td>
+                <td>{{ row.orders.order_date }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">No results. Create some orders first in the REPL.</td>
+            </tr>
+            {% endfor %}
+        </table>
+        
+        <h3>SQL Equivalent:</h3>
+        <pre>SELECT users.name, orders.id, orders.quantity, orders.order_date
+FROM users 
+INNER JOIN orders ON users.id = orders.user_id</pre>
+        {% endif %}
+    </div>
+</body>
+</html>

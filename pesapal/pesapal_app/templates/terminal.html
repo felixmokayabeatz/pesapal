@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web SQL Terminal</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 0;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #007acc;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .terminal-output {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .terminal-input {
+            display: flex;
+            gap: 10px;
+        }
+        .prompt {
+            color: #4ec9b0;
+            font-weight: bold;
+            white-space: nowrap;
+            padding: 10px 0;
+        }
+        #query-input {
+            flex: 1;
+            background: #252526;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            border-radius: 3px;
+        }
+        #query-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: 'Consolas', monospace;
+        }
+        .btn:hover {
+            background: #005a9e;
+        }
+        .output-line {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        .query {
+            color: #569cd6;
+        }
+        .success {
+            color: #4ec9b0;
+        }
+        .error {
+            color: #f44747;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .table th {
+            background: #2d2d30;
+            color: #9cdcfe;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #3e3e42;
+        }
+        .table td {
+            padding: 8px;
+            border: 1px solid #3e3e42;
+            color: #ce9178;
+        }
+        .schema-panel {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .schema-table {
+            margin: 10px 0;
+        }
+        .schema-table h4 {
+            color: #4ec9b0;
+            margin: 10px 0 5px 0;
+        }
+        .help-panel {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .help-panel h3 {
+            color: #569cd6;
+            margin-top: 0;
+        }
+        .help-command {
+            color: #dcdcaa;
+            margin: 5px 0;
+        }
+        .nav {
+            margin: 20px 0;
+        }
+        .nav a {
+            color: #569cd6;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Web SQL Terminal</h1>
+            <p>Interactive SQL interface for Pesapal RDBMS</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/users/">Users</a>
+            <a href="/products/">Products</a>
+            <a href="/terminal/" class="btn">Terminal</a>
+        </div>
+        
+        <div class="schema-panel">
+            <h3>Database Schema</h3>
+            {% for table_name, table_info in schema.tables.items %}
+            <div class="schema-table">
+                <h4>{{ table_name }} ({{ table_info.row_count }} rows)</h4>
+                <table class="table">
+                    <tr>
+                        <th>Column</th>
+                        <th>Type</th>
+                        <th>Constraints</th>
+                    </tr>
+                    {% for col in table_info.columns %}
+                    <tr>
+                        <td>{{ col.name }}</td>
+                        <td>{{ col.type }}</td>
+                        <td>
+                            {% if col.primary %}PRIMARY KEY{% endif %}
+                            {% if col.unique %}UNIQUE{% endif %}
+                            {% if not col.nullable %}NOT NULL{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="terminal-output" id="output">
+            <div class="output-line success">=== Web SQL Terminal ===</div>
+            <div class="output-line">Type SQL commands and press Enter</div>
+            <div class="output-line">Type 'help' for available commands</div>
+            <div class="output-line">Database: {{ schema.name }}</div>
+            <div class="output-line success">Ready!</div>
+        </div>
+        
+        <div class="terminal-input">
+            <div class="prompt">SQL&gt;</div>
+            <input type="text" id="query-input" placeholder="Enter SQL command..." autofocus>
+            <button class="btn" onclick="executeQuery()">Execute</button>
+            <button class="btn" onclick="clearTerminal()">Clear</button>
+        </div>
+        
+        <div class="help-panel">
+            <h3>Available Commands:</h3>
+            <div class="help-command">SELECT * FROM users</div>
+            <div class="help-command">INSERT INTO users (name, email) VALUES ('John', 'john@test.com')</div>
+            <div class="help-command">UPDATE users SET age = 30 WHERE name = 'John'</div>
+            <div class="help-command">DELETE FROM users WHERE id = 1</div>
+            <div class="help-command">CREATE TABLE orders (id INTEGER PRIMARY KEY, ...)</div>
+            <div class="help-command">CREATE INDEX idx_name ON users(name)</div>
+            <div class="help-command">DROP TABLE table_name</div>
+            <div class="help-command">help - Show this help</div>
+            <div class="help-command">clear - Clear terminal</div>
+        </div>
+    </div>
+    
+    <script>
+        const outputDiv = document.getElementById('output');
+        const queryInput = document.getElementById('query-input');
+        const csrfToken = "{{ csrf_token }}";
+        
+        // Handle Enter key in input
+        queryInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                executeQuery();
+            }
+        });
+        
+        // Command history
+        let commandHistory = [];
+        let historyIndex = -1;
+        
+        // Load previous commands from localStorage
+        const savedHistory = localStorage.getItem('sqlHistory');
+        if (savedHistory) {
+            commandHistory = JSON.parse(savedHistory);
+        }
+        
+        // Navigate history with arrow keys
+        queryInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    queryInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    queryInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
+                } else {
+                    historyIndex = -1;
+                    queryInput.value = '';
+                }
+            }
+        });
+        
+        function addToHistory(query) {
+            commandHistory.push(query);
+            if (commandHistory.length > 50) {
+                commandHistory.shift(); // Keep only last 50 commands
+            }
+            localStorage.setItem('sqlHistory', JSON.stringify(commandHistory));
+            historyIndex = -1;
+        }
+        
+        function addOutput(line, className = '') {
+            const lineDiv = document.createElement('div');
+            lineDiv.className = `output-line ${className}`;
+            lineDiv.textContent = line;
+            outputDiv.appendChild(lineDiv);
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+        
+        function executeQuery() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+            
+            // Add query to output
+            addOutput(`SQL> ${query}`, 'query');
+            
+            // Handle special commands
+            if (query.toLowerCase() === 'help') {
+                showHelp();
+                queryInput.value = '';
+                return;
+            }
+            
+            if (query.toLowerCase() === 'clear') {
+                clearTerminal();
+                queryInput.value = '';
+                return;
+            }
+            
+            // Execute via AJAX
+            fetch('/terminal/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: new URLSearchParams({
+                    'query': query
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.type === 'table') {
+                        // Display as table
+                        if (data.data.length > 0) {
+                            const table = document.createElement('table');
+                            table.className = 'table';
+                            
+                            // Create header
+                            const thead = document.createElement('thead');
+                            const headerRow = document.createElement('tr');
+                            Object.keys(data.data[0]).forEach(key => {
+                                const th = document.createElement('th');
+                                th.textContent = key.toUpperCase();
+                                headerRow.appendChild(th);
+                            });
+                            thead.appendChild(headerRow);
+                            table.appendChild(thead);
+                            
+                            // Create rows
+                            const tbody = document.createElement('tbody');
+                            data.data.forEach(row => {
+                                const tr = document.createElement('tr');
+                                Object.values(row).forEach(value => {
+                                    const td = document.createElement('td');
+                                    td.textContent = value;
+                                    tr.appendChild(td);
+                                });
+                                tbody.appendChild(tr);
+                            });
+                            table.appendChild(tbody);
+                            
+                            const tableContainer = document.createElement('div');
+                            tableContainer.appendChild(table);
+                            outputDiv.appendChild(tableContainer);
+                            
+                            addOutput(`${data.count} row(s) returned`, 'success');
+                        } else {
+                            addOutput('Empty result set', 'success');
+                        }
+                    } else {
+                        addOutput(`Result: ${data.data}`, 'success');
+                    }
+                } else {
+                    addOutput(`Error: ${data.error}`, 'error');
+                }
+                
+                // Add to history and clear input
+                addToHistory(query);
+                queryInput.value = '';
+                
+                // Scroll to bottom
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+            })
+            .catch(error => {
+                addOutput(`Request failed: ${error}`, 'error');
+                queryInput.value = '';
+            });
+        }
+        
+        function showHelp() {
+            addOutput('Available SQL Commands:', 'success');
+            addOutput('  SELECT * FROM table_name [WHERE condition]');
+            addOutput('  INSERT INTO table_name (col1, col2) VALUES (val1, val2)');
+            addOutput('  UPDATE table_name SET col=val [WHERE condition]');
+            addOutput('  DELETE FROM table_name [WHERE condition]');
+            addOutput('  CREATE TABLE name (col TYPE [PRIMARY KEY|UNIQUE|NOT NULL], ...)');
+            addOutput('  DROP TABLE table_name');
+            addOutput('  CREATE INDEX idx_name ON table_name(column)');
+            addOutput('');
+            addOutput('Special Commands:', 'success');
+            addOutput('  help  - Show this help');
+            addOutput('  clear - Clear terminal');
+            addOutput('');
+            addOutput('Examples:', 'success');
+            addOutput("  SELECT * FROM users WHERE age > 25");
+            addOutput("  INSERT INTO users (name, email) VALUES ('Alice', 'alice@test.com')");
+            addOutput("  UPDATE products SET price = 99.99 WHERE name = 'Laptop'");
+        }
+        
+        function clearTerminal() {
+            outputDiv.innerHTML = '';
+            addOutput('Terminal cleared', 'success');
+            addOutput('Type SQL commands and press Enter', '');
+            addOutput('Database: {{ schema.name }}', '');
+        }
+        
+        // Auto-focus on input
+        queryInput.focus();
+    </script>
+</body>
+</html>
