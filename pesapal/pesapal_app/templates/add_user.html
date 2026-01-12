@@ -1,3 +1,4 @@
+<!-- add_user.html - Updated version -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -9,6 +10,9 @@
         label { display: block; margin-bottom: 5px; }
         input { width: 100%; padding: 8px; }
         .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
+        .error { color: red; background: #ffe6e6; padding: 10px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #ff9999; }
+        .form-control { border: 1px solid #ccc; }
+        .form-control.error-input { border-color: red; }
     </style>
 </head>
 <body>
@@ -16,21 +20,37 @@
         <h1>Add New User</h1>
         <a href="/users/" class="btn">Back to Users</a>
         
+        {% if error %}
+        <div class="error">
+            <strong>Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
         <form method="post" style="margin-top: 20px;">
             {% csrf_token %}
             <div class="form-group">
-                <label>Name:</label>
-                <input type="text" name="name" required>
+                <label>Name: *</label>
+                <input type="text" name="name" value="{{ name|default:'' }}" required 
+                       class="form-control {% if error and not name %}error-input{% endif %}">
+                {% if error and not name %}
+                <small style="color: red;">Name is required</small>
+                {% endif %}
             </div>
             <div class="form-group">
-                <label>Email:</label>
-                <input type="email" name="email" required>
+                <label>Email: *</label>
+                <input type="email" name="email" value="{{ email|default:'' }}" required
+                       class="form-control {% if error and 'email' in error|lower %}error-input{% endif %}">
+                {% if error and 'email' in error|lower %}
+                <small style="color: red;">{{ error }}</small>
+                {% endif %}
             </div>
             <div class="form-group">
                 <label>Age:</label>
-                <input type="number" name="age">
+                <input type="number" name="age" value="{{ age|default:'' }}" min="1" max="150"
+                       class="form-control">
             </div>
             <button type="submit" class="btn">Save User</button>
+            <a href="/users/" class="btn" style="background: #ccc; margin-left: 10px;">Cancel</a>
         </form>
     </div>
 </body>
