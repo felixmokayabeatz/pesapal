@@ -308,36 +308,112 @@ def api_schema(request):
     return JsonResponse(schema)
 
 
+# pesapal_app/views.py - Enhanced run_join view
+
 def run_join(request):
-    """Demonstrate JOIN operation"""
+    """Demonstrate JOIN operations with different types"""
     db = RDBMSWrapper.get_db()
     
-    # Create orders table for JOIN demo
-    try:
-        db.execute_sql("""
-            CREATE TABLE orders (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER,
-                product_id INTEGER,
-                quantity INTEGER,
-                order_date TEXT
-            )
-        """)
-        
-        # Insert sample orders
-        db.execute_sql("INSERT INTO orders (user_id, product_id, quantity, order_date) VALUES (1, 1, 2, '2024-01-20')")
-        db.execute_sql("INSERT INTO orders (user_id, product_id, quantity, order_date) VALUES (2, 2, 1, '2024-01-21')")
-        
-    except Exception:
-        pass  # Table might exist
+    # Ensure we have sample data
+    ensure_join_sample_data(db)
     
-    # Perform JOIN
+    # Get JOIN type from query parameter
+    join_type = request.GET.get('type', 'INNER').upper()
+    valid_types = ['INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS']
+    
+    if join_type not in valid_types:
+        join_type = 'INNER'
+    
     try:
-        results = db.join('users', 'orders', 'users.id = orders.user_id')
-        return render(request, 'join_demo.html', {'results': results})
+        # Perform JOIN with specified type
+        results = db.join('users', 'orders', 'users.id = orders.user_id', join_type)
+        
+        # Calculate statistics
+        total_rows = len(results)
+        users_with_orders = len(set(r.get('users.id') for r in results if r.get('users.id')))
+        orders_with_users = len(set(r.get('orders.id') for r in results if r.get('orders.id')))
+        
+        return render(request, 'join_demo.html', {
+            'results': results,
+            'join_type': join_type,
+            'total_rows': total_rows,
+            'users_with_orders': users_with_orders,
+            'orders_with_users': orders_with_users,
+            'join_types': valid_types
+        })
     except Exception as e:
         return render(request, 'join_demo.html', {'error': str(e)})
-    
+
+def ensure_join_sample_data(db):
+    """Create sample data for JOIN demonstration if needed"""
+    try:
+        # Create users table if not exists
+        try:
+            db.execute_sql("""
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE,
+                    age INTEGER
+                )
+            """)
+            
+            # Insert sample users
+            sample_users = [
+                (1, 'Alice Johnson', 'alice@example.com', 25),
+                (2, 'Bob Smith', 'bob@example.com', 30),
+                (3, 'Charlie Brown', 'charlie@example.com', 35),
+                (4, 'Diana Prince', 'diana@example.com', 28)
+            ]
+            
+            for user_id, name, email, age in sample_users:
+                try:
+                    db.execute_sql(f"""
+                        INSERT INTO users (id, name, email, age) 
+                        VALUES ({user_id}, '{name}', '{email}', {age})
+                    """)
+                except:
+                    pass  # User might already exist
+        except:
+            pass  # Table might already exist
+        
+        # Create orders table if not exists
+        try:
+            db.execute_sql("""
+                CREATE TABLE orders (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER,
+                    product_name TEXT,
+                    quantity INTEGER,
+                    order_date TEXT,
+                    total_price REAL
+                )
+            """)
+            
+            # Insert sample orders
+            sample_orders = [
+                (1, 1, 'Laptop', 1, '2024-01-15', 999.99),
+                (2, 1, 'Mouse', 2, '2024-01-15', 49.98),
+                (3, 2, 'Keyboard', 1, '2024-01-16', 79.99),
+                (4, 2, 'Monitor', 1, '2024-01-17', 299.99),
+                (5, 5, 'Headphones', 1, '2024-01-18', 149.99)  # user_id=5 doesn't exist in users
+            ]
+            
+            for order_id, user_id, product, quantity, date, price in sample_orders:
+                try:
+                    db.execute_sql(f"""
+                        INSERT INTO orders (id, user_id, product_name, quantity, order_date, total_price) 
+                        VALUES ({order_id}, {user_id}, '{product}', {quantity}, '{date}', {price})
+                    """)
+                except:
+                    pass  # Order might already exist
+        except:
+            pass  # Table might already exist
+        
+        RDBMSWrapper.save_db()
+        
+    except Exception as e:
+        print(f"Error creating sample data: {e}")
 
 
 def web_terminal(request):
