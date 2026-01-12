@@ -1,3 +1,5 @@
+# pesapal_app/views.py
+
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import User, Product, RDBMSWrapper
@@ -69,12 +71,47 @@ def add_user(request):
         email = request.POST.get('email')
         age = request.POST.get('age')
         
-        user = User(name=name, email=email, age=int(age) if age else None)
-        user.save()
-
-        RDBMSWrapper.save_db()
+        db = RDBMSWrapper.get_db()
         
-        return redirect('users')
+        try:
+            # Get next ID
+            result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
+            max_id = 0
+            if result and isinstance(result, list) and len(result) > 0:
+                max_id_dict = result[0]
+                max_id = max_id_dict.get('max_id', 0) or 0
+                if isinstance(max_id, str) and max_id.isdigit():
+                    max_id = int(max_id)
+            
+            new_id = max_id + 1 if max_id else 1
+            
+            # Prepare age value
+            if age and age.isdigit():
+                age_value = int(age)
+            else:
+                age_value = "NULL"
+            
+            # Simple single-line INSERT
+            sql = f"INSERT INTO users (id, name, email, age, created_at) VALUES ({new_id}, '{name}', '{email}', {age_value}, '2024-01-15')"
+            
+            print(f"DEBUG add_user: Executing SQL: {sql}")
+            db.execute_sql(sql)
+            RDBMSWrapper.save_db()
+            
+            print(f"✓ User added with id={new_id}")
+            return redirect('users')
+            
+        except Exception as e:
+            print(f"✗ Error in add_user: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return to form with error
+            return render(request, 'add_user.html', {
+                'error': str(e),
+                'name': name,
+                'email': email,
+                'age': age
+            })
     
     return render(request, 'add_user.html')
 
