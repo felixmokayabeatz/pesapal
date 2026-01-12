@@ -8,9 +8,31 @@ def index(request):
     db = RDBMSWrapper.get_db()
     schema = db.get_schema()
     
+    # Calculate stats
+    total_tables = len(schema['tables'])
+    total_rows = sum(table['row_count'] for table in schema['tables'].values())
+    
+    # Get sample data for each table
+    for table_name, table_info in schema['tables'].items():
+        if table_info['row_count'] > 0:
+            try:
+                result = db.execute_sql(f"SELECT * FROM {table_name} LIMIT 1")
+                if result:
+                    table_info['sample_data'] = result[0]
+            except:
+                table_info['sample_data'] = {}
+    
+    # Get specific counts
+    user_count = schema['tables'].get('users', {}).get('row_count', 0)
+    product_count = schema['tables'].get('products', {}).get('row_count', 0)
+    
     context = {
         'database_name': schema['name'],
         'tables': schema['tables'],
+        'total_tables': total_tables,
+        'total_rows': total_rows,
+        'user_count': user_count,
+        'product_count': product_count,
     }
     return render(request, 'index.html', context)
 
@@ -18,7 +40,26 @@ def index(request):
 def users_view(request):
     """List all users"""
     users = User.objects().all()
-    return render(request, 'users.html', {'users': users})
+    
+    # Convert to template-friendly format
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user.id,
+            'name': user.name or '',
+            'email': user.email or '',
+            'age': user.age if user.age not in (None, 'None', '') else '',
+            'created_at': user.created_at or ''
+        })
+    
+    # Calculate average age for stats
+    ages = [u['age'] for u in user_list if u['age'] and str(u['age']).isdigit()]
+    avg_age = sum(int(age) for age in ages) // len(ages) if ages else 0
+    
+    return render(request, 'users.html', {
+        'users': user_list,
+        'avg_age': avg_age
+    })
 
 
 def add_user(request):
@@ -30,6 +71,8 @@ def add_user(request):
         
         user = User(name=name, email=email, age=int(age) if age else None)
         user.save()
+
+        RDBMSWrapper.save_db()
         
         return redirect('users')
     
@@ -58,14 +101,37 @@ def delete_user(request, user_id):
     """Delete a user"""
     db = RDBMSWrapper.get_db()
     db.execute_sql(f"DELETE FROM users WHERE id = {user_id}")
+
+    RDBMSWrapper.save_db()
+
     return redirect('users')
 
 
 def products_view(request):
     """List all products"""
     products = Product.objects().all()
-    return render(request, 'products.html', {'products': products})
-
+    
+    # Convert to template-friendly format
+    product_list = []
+    for product in products:
+        # Handle in_stock conversion
+        in_stock = product.in_stock
+        if isinstance(in_stock, str):
+            in_stock = in_stock.lower() in ('true', '1', 'yes', 'y')
+        elif isinstance(in_stock, int):
+            in_stock = bool(in_stock)
+        
+        product_list.append({
+            'id': product.id,
+            'name': product.name or '',
+            'price': float(product.price) if product.price else 0.0,
+            'in_stock': in_stock,
+            'category': product.category or ''
+        })
+    
+    return render(request, 'products.html', {
+        'products': product_list
+    })
 
 def add_product(request):
     """Add a new product"""
@@ -80,22 +146,49 @@ def add_product(request):
             INSERT INTO products (name, price, in_stock, category) 
             VALUES ('{name}', {price}, {in_stock}, '{category}')
         """)
-        
+        RDBMSWrapper.save_db()
         return redirect('products')
     
     return render(request, 'add_product.html')
 
 
 def api_query(request):
-    """Execute SQL query via API"""
+    """Execute SQL query via API with different formats"""
     if request.method == 'POST':
         query = request.POST.get('query', '')
+        format = request.POST.get('format', 'table')
+        
         try:
             db = RDBMSWrapper.get_db()
             result = db.execute_sql(query)
+            
+            # Handle different result types
+            if isinstance(result, list):
+                # Apply limit for table format
+                if format == 'table':
+                    result = result[:100]  # Default limit
+                
+                # Convert to serializable format
+                serializable_result = []
+                for row in result:
+                    if hasattr(row, 'items'):
+                        serializable_row = {}
+                        for key, value in row.items():
+                            serializable_row[str(key)] = str(value) if value is not None else None
+                        serializable_result.append(serializable_row)
+                    else:
+                        serializable_result.append(str(row))
+                
+                result = serializable_result
+            elif result is None:
+                result = "Query executed successfully"
+            else:
+                result = str(result)
+            
             return JsonResponse({
                 'success': True,
-                'result': result
+                'result': result,
+                'format': format
             })
         except Exception as e:
             return JsonResponse({
@@ -151,23 +244,49 @@ def web_terminal(request):
     
     if request.method == 'POST':
         query = request.POST.get('query', '')
+        format = request.POST.get('format', 'table')
+        limit = int(request.POST.get('limit', 100))
+        
         try:
+            # Handle SCHEMA command
+            if query.upper() == 'SCHEMA':
+                schema = db.get_schema()
+                return JsonResponse({
+                    'success': True,
+                    'result': schema,
+                    'format': format
+                })
+            
             result = db.execute_sql(query)
             
-            # Format result for display
+            # Handle different result types
             if isinstance(result, list):
-                return JsonResponse({
-                    'success': True,
-                    'type': 'table',
-                    'data': result,
-                    'count': len(result)
-                })
+                # Apply limit for table format
+                if format == 'table':
+                    result = result[:limit]
+                
+                # Convert to serializable format
+                serializable_result = []
+                for row in result:
+                    if hasattr(row, 'items'):
+                        serializable_row = {}
+                        for key, value in row.items():
+                            serializable_row[str(key)] = str(value) if value is not None else None
+                        serializable_result.append(serializable_row)
+                    else:
+                        serializable_result.append(str(row))
+                
+                result = serializable_result
+            elif result is None:
+                result = "Query executed successfully"
             else:
-                return JsonResponse({
-                    'success': True,
-                    'type': 'scalar',
-                    'data': result
-                })
+                result = str(result)
+            
+            return JsonResponse({
+                'success': True,
+                'result': result,
+                'format': format
+            })
                 
         except Exception as e:
             return JsonResponse({
@@ -175,6 +294,6 @@ def web_terminal(request):
                 'error': str(e)
             })
     
-    # Get current schema for display
+    # GET request - show terminal
     schema = db.get_schema()
     return render(request, 'terminal.html', {'schema': schema})
