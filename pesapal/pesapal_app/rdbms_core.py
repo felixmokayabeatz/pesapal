@@ -660,28 +660,117 @@ class Database:
             except:
                 return value_str
     
-    def join(self, table1: str, table2: str, on_clause: str) -> List[Dict]:
+    def join(self, table1: str, table2: str, on_clause: str, join_type: str = "INNER") -> List[Dict]:
+        """
+        Perform JOIN operation between two tables
+        
+        Args:
+            table1: First table name
+            table2: Second table name
+            on_clause: JOIN condition (e.g., "users.id = orders.user_id")
+            join_type: Type of join - "INNER", "LEFT", "RIGHT", "FULL", "CROSS"
+        
+        Returns:
+            List of joined rows
+        """
         if table1 not in self.tables or table2 not in self.tables:
             raise ValueError("Table(s) not found")
         
         t1 = self.tables[table1]
         t2 = self.tables[table2]
         
+        # Parse ON clause
         pattern = r'(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)'
         match = re.match(pattern, on_clause)
         if not match:
-            raise ValueError("Invalid JOIN")
+            raise ValueError("Invalid JOIN condition. Use format: table1.column = table2.column")
         
         t1_name, t1_col, t2_name, t2_col = match.groups()
         
         results = []
-        for row1 in t1.select():
-            for row2 in t2.select():
-                if row1.get(t1_col) == row2.get(t2_col):
-                    merged = {f"{table1}.{k}": v for k, v in row1.items()}
-                    merged.update({f"{table2}.{k}": v for k, v in row2.items()})
+        
+        if join_type.upper() == "INNER":
+            # INNER JOIN: Only rows with matches in both tables
+            for row1 in t1.select():
+                for row2 in t2.select():
+                    if row1.get(t1_col) == row2.get(t2_col):
+                        merged = self._merge_rows(table1, row1, table2, row2)
+                        results.append(merged)
+        
+        elif join_type.upper() == "LEFT":
+            # LEFT JOIN: All rows from table1, matched rows from table2
+            for row1 in t1.select():
+                matched = False
+                for row2 in t2.select():
+                    if row1.get(t1_col) == row2.get(t2_col):
+                        merged = self._merge_rows(table1, row1, table2, row2)
+                        results.append(merged)
+                        matched = True
+                
+                # If no match, include row1 with nulls for table2
+                if not matched:
+                    merged = self._merge_rows(table1, row1, table2, {})
                     results.append(merged)
+        
+        elif join_type.upper() == "RIGHT":
+            # RIGHT JOIN: All rows from table2, matched rows from table1
+            for row2 in t2.select():
+                matched = False
+                for row1 in t1.select():
+                    if row1.get(t1_col) == row2.get(t2_col):
+                        merged = self._merge_rows(table1, row1, table2, row2)
+                        results.append(merged)
+                        matched = True
+                
+                # If no match, include row2 with nulls for table1
+                if not matched:
+                    merged = self._merge_rows(table1, {}, table2, row2)
+                    results.append(merged)
+        
+        elif join_type.upper() == "FULL":
+            # FULL OUTER JOIN: All rows from both tables
+            # We'll implement as LEFT JOIN + unmatched RIGHT rows
+            left_results = self.join(table1, table2, on_clause, "LEFT")
+            
+            # Get rows from table2 that don't have matches in table1
+            for row2 in t2.select():
+                has_match = False
+                for result in left_results:
+                    if result.get(f"{table2}.{t2_col}") == row2.get(t2_col):
+                        has_match = True
+                        break
+                
+                if not has_match:
+                    merged = self._merge_rows(table1, {}, table2, row2)
+                    results.append(merged)
+            
+            results.extend(left_results)
+        
+        elif join_type.upper() == "CROSS":
+            # CROSS JOIN: All possible combinations
+            for row1 in t1.select():
+                for row2 in t2.select():
+                    merged = self._merge_rows(table1, row1, table2, row2)
+                    results.append(merged)
+        
+        else:
+            raise ValueError(f"Unsupported JOIN type: {join_type}. Use INNER, LEFT, RIGHT, FULL, or CROSS")
+        
         return results
+    
+    def _merge_rows(self, table1: str, row1: Dict, table2: str, row2: Dict) -> Dict:
+        """Merge two rows with table prefixes"""
+        merged = {}
+        
+        # Add table1 columns with prefix
+        for key, value in row1.items():
+            merged[f"{table1}.{key}"] = value
+        
+        # Add table2 columns with prefix
+        for key, value in row2.items():
+            merged[f"{table2}.{key}"] = value
+        
+        return merged
     
     def get_schema(self) -> Dict:
         return {
