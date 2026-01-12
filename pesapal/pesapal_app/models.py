@@ -98,6 +98,90 @@ class RDBMSWrapper:
             cls._instance.save_to_file()
             return True
         return False
+    
+    @classmethod
+    def check_and_repair_tables(cls):
+        """Check if tables have minimum required columns, add if missing"""
+        db = cls.get_db()
+        
+        print("=== Checking and repairing tables ===")
+        
+        # Check users table
+        if 'users' in db.tables:
+            table = db.tables['users']
+            existing_columns = [col.name.lower() for col in table.columns]
+            print(f"DEBUG: Users table columns: {existing_columns}")
+            
+            # Ensure at least 'id' and 'name' exist
+            if 'id' not in existing_columns:
+                print("WARNING: Users table missing 'id' column")
+                # Can't fix this easily - would need to recreate table
+                
+            if 'name' not in existing_columns:
+                print("Adding 'name' column to users table")
+                try:
+                    db.execute_sql("ALTER TABLE users ADD COLUMN name TEXT")
+                except:
+                    print("Could not add name column")
+        
+        cls.save_db()
+        return True
+    
+    @classmethod
+    def fix_duplicate_emails(cls):
+        """Fix duplicate emails in the database"""
+        db = cls.get_db()
+        
+        print("=== Fixing duplicate emails ===")
+        
+        try:
+            # Find duplicate emails
+            result = db.execute_sql("""
+                SELECT email, COUNT(*) as count 
+                FROM users 
+                WHERE email IS NOT NULL AND email != ''
+                GROUP BY email 
+                HAVING COUNT(*) > 1
+            """)
+            
+            if not result:
+                print("No duplicate emails found")
+                return True
+            
+            print(f"Found {len(result)} email(s) with duplicates:")
+            for row in result:
+                print(f"  {row['email']}: {row['count']} duplicates")
+            
+            # Fix each duplicate
+            for dup in result:
+                email = dup['email']
+                count = dup['count']
+                
+                # Get all users with this email
+                users = db.execute_sql(f"SELECT id, name FROM users WHERE email = '{email}' ORDER BY id")
+                
+                # Keep the first one, modify the rest
+                for i, user in enumerate(users):
+                    if i == 0:
+                        continue  # Keep first one as is
+                    
+                    user_id = user['id']
+                    new_email = f"{email}.{i}"  # Add suffix to make unique
+                    
+                    print(f"  Changing user {user_id} email from '{email}' to '{new_email}'")
+                    
+                    # Update the user
+                    db.execute_sql(f"UPDATE users SET email = '{new_email}' WHERE id = {user_id}")
+            
+            cls.save_db()
+            print("✓ Fixed duplicate emails")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error fixing duplicate emails: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 
 class UserManager:
@@ -116,32 +200,27 @@ class UserManager:
             for i, row in enumerate(results):
                 print(f"DEBUG UserManager.all(): Row {i} = {row}")
                 
-                # Create user with the exact keys from the database
-                # First, normalize the keys to match what User.__init__ expects
-                user_kwargs = {}
-                
+                # Clean the row data - remove keys with underscores that might cause issues
+                cleaned_row = {}
                 for key, value in row.items():
-                    # Store original key
-                    user_kwargs[key] = value
-                    # Also store uppercase version
-                    user_kwargs[key.upper()] = value
-                    # Also store lowercase version
-                    user_kwargs[key.lower()] = value
-                    # Also store version without underscores
-                    clean_key = key.lower().replace('_', '')
-                    user_kwargs[clean_key] = value
+                    # Skip keys that start with underscore (except '_id')
+                    if key == '_id':
+                        cleaned_row['id'] = value
+                    elif not key.startswith('_'):
+                        cleaned_row[key] = value
                 
-                print(f"DEBUG UserManager.all(): User kwargs = {user_kwargs}")
+                print(f"DEBUG UserManager.all(): Cleaned row: {cleaned_row}")
                 
                 try:
-                    user = User(**user_kwargs)
+                    # Pass cleaned row as kwargs
+                    user = User(**cleaned_row)
                     users.append(user)
                 except Exception as e:
                     print(f"DEBUG UserManager.all(): Error creating user: {e}")
                     # Fallback: create empty user and set attributes manually
                     user = User()
                     
-                    # Extract data from row using all possible key variations
+                    # Extract data from row
                     for key, value in row.items():
                         key_lower = key.lower()
                         if key_lower in ['id', '_id']:
@@ -256,56 +335,73 @@ class UserManager:
 class User:
     """User model"""
     
-    def __init__(self, id=None, ID=None, name=None, NAME=None, email=None, EMAIL=None, 
-                 age=None, AGE=None, created_at=None, CREATED_AT=None, CREATEDAT=None, 
-                 createdat=None, _id=None):
-        # Handle all possible column name variations
-        self.id = id or ID or _id
-        self.name = name or NAME or ''
-        self.email = email or EMAIL or ''
-        
-        # Handle age - convert to int if possible
-        age_val = age or AGE
-        if age_val is not None and age_val != '':
-            try:
-                self.age = int(age_val)
-            except (ValueError, TypeError):
-                self.age = None
-        else:
+    def __init__(self, **kwargs):
+            # Set defaults
+            self.id = None
+            self.name = ''
+            self.email = ''
             self.age = None
+            self.created_at = '2024-01-01'
             
-        self.created_at = created_at or CREATED_AT or CREATEDAT or createdat or '2024-01-01'
-        
-        # Debug - PRINT ALL FIELDS!
-        print(f"DEBUG User.__init__(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
+            # Process kwargs, ignoring unknown ones
+            for key, value in kwargs.items():
+                key_lower = key.lower().replace('_', '')
+                
+                if key_lower in ['id', '_id']:
+                    if value is not None:
+                        try:
+                            self.id = int(value)
+                        except (ValueError, TypeError):
+                            self.id = value
+                elif key_lower == 'name':
+                    self.name = str(value) if value is not None else ''
+                elif key_lower == 'email':
+                    self.email = str(value) if value is not None else ''
+                elif key_lower == 'age':
+                    if value is not None and str(value).strip():
+                        try:
+                            self.age = int(value)
+                        except (ValueError, TypeError):
+                            try:
+                                self.age = int(float(value))
+                            except:
+                                self.age = None
+                elif key_lower == 'createdat':
+                    self.created_at = str(value) if value is not None else '2024-01-01'
+            
+            # Debug
+            print(f"DEBUG User.__init__(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
     
     @classmethod
     def objects(cls):
         return UserManager()
     
     def save(self):
-        """Save user to database with error handling for unique constraints"""
+        """Save user to database - enforce email uniqueness"""
         db = RDBMSWrapper.get_db()
         
         print(f"DEBUG User.save(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
         
-        # Validate email uniqueness (additional check before trying SQL)
+        # First, ensure table has proper structure with UNIQUE email
+        self._ensure_table_columns(db)
+        
+        # Check email uniqueness at application level
         if self.email:
+            # Check if email already exists for other users
+            if self.id:
+                # For updates: check if email exists for other users
+                check_sql = f"SELECT id FROM users WHERE email = '{self.email}' AND id != {self.id}"
+            else:
+                # For inserts: check if email exists at all
+                check_sql = f"SELECT id FROM users WHERE email = '{self.email}'"
+            
             try:
-                # Check if email already exists for other users
-                if self.id:
-                    # For updates: check if email exists for other users
-                    check_sql = f"SELECT id FROM users WHERE email = '{self.email}' AND id != {self.id}"
-                else:
-                    # For inserts: check if email exists at all
-                    check_sql = f"SELECT id FROM users WHERE email = '{self.email}'"
-                
                 existing = db.execute_sql(check_sql)
                 if existing:
                     raise ValueError(f"Email '{self.email}' is already in use by another user")
             except Exception as check_error:
-                # If check fails, we'll let the database enforce it
-                print(f"DEBUG: Email check error (will let DB handle): {check_error}")
+                print(f"DEBUG: Email check error: {check_error}")
+                # Continue anyway, database constraint will catch it
         
         # Convert ID to string for comparison
         id_str = str(self.id) if self.id is not None else None
@@ -323,6 +419,7 @@ class User:
                     set_parts.append(f"email = '{self.email}'")
                 if self.age is not None:
                     set_parts.append(f"age = {self.age}")
+                set_parts.append(f"created_at = '{self.created_at}'")
                 
                 if set_parts:
                     set_clause = ", ".join(set_parts)
@@ -347,7 +444,8 @@ class User:
                 raise ValueError(f"Email '{self.email}' is already in use. Please use a different email.")
             else:
                 # Re-raise other errors
-                raise
+                import traceback
+                traceback.print_exc()
         
         # If UPDATE failed or no ID, do INSERT
         print(f"DEBUG: Attempting INSERT for user")
@@ -383,6 +481,161 @@ class User:
             else:
                 # Re-raise other errors
                 raise
+    
+    def _ensure_table_columns(self, db):
+        """Ensure the users table has the columns we need with proper constraints"""
+        try:
+            # Get table schema
+            schema = db.get_schema()
+            
+            if 'users' not in schema['tables']:
+                # Table doesn't exist - create it with proper schema including UNIQUE email
+                print("DEBUG: Users table doesn't exist, creating with UNIQUE email...")
+                db.execute_sql("""
+                    CREATE TABLE users (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        email TEXT UNIQUE,
+                        age INTEGER,
+                        created_at TEXT DEFAULT '2024-01-01'
+                    )
+                """)
+                return
+            
+            # Check what columns exist and their constraints
+            users_columns = schema['tables']['users']['columns']
+            existing_columns = {}
+            for col in users_columns:
+                col_name = col['name'].lower()
+                existing_columns[col_name] = {
+                    'exists': True,
+                    'is_unique': col['unique']
+                }
+            
+            print(f"DEBUG: Existing columns in users table: {existing_columns}")
+            
+            # Check if email column exists and is UNIQUE
+            if 'email' not in existing_columns:
+                print("DEBUG: Email column doesn't exist, adding...")
+                
+                # Try to add column first
+                try:
+                    db.execute_sql("ALTER TABLE users ADD COLUMN email TEXT")
+                    print("DEBUG: Added email column (non-unique)")
+                    
+                    # Now we need to make it unique by recreating table
+                    self._make_email_unique(db)
+                    
+                except Exception as e:
+                    print(f"DEBUG: Could not add email column: {e}")
+            else:
+                # Email column exists, check if it's UNIQUE
+                if not existing_columns['email']['is_unique']:
+                    print("DEBUG: Email column exists but is not UNIQUE, fixing...")
+                    self._make_email_unique(db)
+            
+            # Check and add other missing columns
+            other_columns = {
+                'age': 'INTEGER',
+                'created_at': 'TEXT'
+            }
+            
+            for col_name, col_type in other_columns.items():
+                if col_name not in existing_columns:
+                    print(f"DEBUG: Adding missing column '{col_name}' to users table")
+                    try:
+                        sql = f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"
+                        db.execute_sql(sql)
+                        print(f"DEBUG: Added column '{col_name}'")
+                    except Exception as e:
+                        print(f"DEBUG: Could not add column '{col_name}': {e}")
+                        
+        except Exception as e:
+            print(f"DEBUG: Error ensuring table columns: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _make_email_unique(self, db):
+        """Recreate users table with UNIQUE email constraint"""
+        print("DEBUG: Making email column UNIQUE...")
+        
+        try:
+            # Backup existing data
+            existing_data = db.execute_sql("SELECT * FROM users")
+            print(f"DEBUG: Found {len(existing_data)} users to migrate")
+            
+            # Create temp table with UNIQUE email
+            try:
+                db.execute_sql("DROP TABLE users_new")
+            except:
+                pass
+            
+            db.execute_sql("""
+                CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE,
+                    age INTEGER,
+                    created_at TEXT DEFAULT '2024-01-01'
+                )
+            """)
+            
+            # Migrate data, handling potential duplicate emails
+            duplicate_emails = set()
+            migrated_count = 0
+            
+            for i, user in enumerate(existing_data):
+                user_id = user.get('id', user.get('ID', i+1))
+                name = user.get('name', user.get('NAME', f'User {user_id}'))
+                email = user.get('email', user.get('EMAIL', ''))
+                age = user.get('age', user.get('AGE'))
+                created_at = user.get('created_at', user.get('CREATED_AT', '2024-01-01'))
+                
+                # If email is empty, generate a placeholder
+                if not email:
+                    email = f"user{user_id}@example.com"
+                
+                # Check if this email already exists in our migration
+                if email and email in duplicate_emails:
+                    # Generate unique email for duplicate
+                    email = f"user{user_id}.dup@example.com"
+                
+                # Try to insert
+                try:
+                    age_value = f"{age}" if age is not None else "NULL"
+                    sql = f"""
+                        INSERT INTO users_new (id, name, email, age, created_at)
+                        VALUES ({user_id}, '{name}', '{email}', {age_value}, '{created_at}')
+                    """
+                    db.execute_sql(sql)
+                    migrated_count += 1
+                    
+                    if email:
+                        duplicate_emails.add(email)
+                        
+                except Exception as e:
+                    if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                        # Duplicate email found, generate unique one
+                        email = f"user{user_id}.{i}@example.com"
+                        sql = f"""
+                            INSERT INTO users_new (id, name, email, age, created_at)
+                            VALUES ({user_id}, '{name}', '{email}', {age_value}, '{created_at}')
+                        """
+                        db.execute_sql(sql)
+                        migrated_count += 1
+                    else:
+                        print(f"DEBUG: Error migrating user {user_id}: {e}")
+            
+            # Replace table
+            db.execute_sql("DROP TABLE users")
+            db.execute_sql("ALTER TABLE users_new RENAME TO users")
+            
+            print(f"DEBUG: Successfully migrated {migrated_count} users to table with UNIQUE email")
+            
+        except Exception as e:
+            print(f"DEBUG: Error making email unique: {e}")
+            import traceback
+            traceback.print_exc()
     
     def delete(self):
         """Delete user from database"""
