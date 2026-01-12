@@ -1,67 +1,116 @@
 #!/usr/bin/env python
-"""
-REPL Interface for Custom RDBMS
-Run with: python run_repl.py
-"""
+"""REPL with file persistence"""
 import sys
 import os
 
-# Add the project to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-try:
-    from pesapal_app.rdbms_core import Database, REPL
-except ImportError:
-    print("Error: Could not import from pesapal_app")
-    print("Make sure you're running from the correct directory:")
-    print("Current directory:", os.getcwd())
-    sys.exit(1)
+from pesapal_app.rdbms_core import Database
 
 def main():
-    print("=== Pesapal RDBMS REPL ===")
-    print("Interactive SQL Interface")
-    print("Type 'HELP' for commands, 'EXIT' to quit")
-    print("=" * 40)
+    db = Database("pesapal_db")
     
-    # Create database instance
-    db = Database("pesapal_challenge_db")
+    # Try to load from file
+    if os.path.exists("db.pesapal"):
+        if db.load_from_file():
+            print("✓ Loaded from db.pesapal")
+        else:
+            print("✗ Could not load, starting fresh")
+            # Create sample tables
+            try:
+                db.execute_sql("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        email TEXT UNIQUE,
+                        age INTEGER,
+                        created_at TEXT
+                    )
+                """)
+                
+                db.execute_sql("""
+                    CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        price REAL,
+                        in_stock BOOLEAN,
+                        category TEXT
+                    )
+                """)
+            except:
+                pass
+    else:
+        print("✗ No db.pesapal file found, starting fresh")
     
-    # Initialize with sample data
-    try:
-        # Create users table
-        db.execute_sql("""
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE,
-                age INTEGER,
-                created_at TEXT
-            )
-        """)
-        print("Created 'users' table")
-    except Exception:
-        pass  # Table might exist
+    print("\n" + "="*50)
+    print("PESAPALDB REPL with File Persistence")
+    print("Database will auto-save to 'db.pesapal'")
+    print("Commands: SAVE, LOAD, EXIT, or SQL")
+    print("="*50 + "\n")
     
-    try:
-        # Create products table
-        db.execute_sql("""
-            CREATE TABLE products (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                price REAL,
-                in_stock BOOLEAN,
-                category TEXT
-            )
-        """)
-        print("Created 'products' table")
-    except Exception:
-        pass
-    
-    # Start REPL
-    repl = REPL(db)
-    repl.run()
-    
-    print("\nGoodbye!")
+    while True:
+        try:
+            cmd = input("SQL> ").strip()
+            
+            if cmd.upper() == 'EXIT':
+                # Save before exiting
+                db.save_to_file()
+                print("Database saved. Goodbye!")
+                break
+                
+            elif cmd.upper() == 'SAVE':
+                db.save_to_file()
+                
+            elif cmd.upper() == 'LOAD':
+                db.load_from_file()
+                
+            elif cmd.upper() == 'HELP':
+                print("""
+Commands:
+  SAVE           - Save database to db.pesapal
+  LOAD           - Load database from db.pesapal
+  SCHEMA         - Show database schema
+  EXIT           - Exit and save
+  Any SQL query  - Execute SQL
+                """)
+                
+            elif cmd.upper() == 'SCHEMA':
+                schema = db.get_schema()
+                print(f"\nDatabase: {schema['name']}")
+                for table_name, info in schema['tables'].items():
+                    print(f"\n{table_name} ({info['row_count']} rows)")
+                    for col in info['columns']:
+                        constr = []
+                        if col['primary']: constr.append("PK")
+                        if col['unique']: constr.append("UNIQUE")
+                        if not col['nullable']: constr.append("NOT NULL")
+                        constr_str = f" ({', '.join(constr)})" if constr else ""
+                        print(f"  {col['name']}: {col['type']}{constr_str}")
+                print()
+                
+            else:
+                # Execute SQL
+                result = db.execute_sql(cmd)
+                if result is not None:
+                    if isinstance(result, list):
+                        if result:
+                            headers = list(result[0].keys())
+                            print(" | ".join(headers))
+                            print("-" * 40)
+                            for row in result:
+                                print(" | ".join(str(row.get(h, '')) for h in headers))
+                            print(f"\n{len(result)} rows")
+                        else:
+                            print("Empty result set")
+                    else:
+                        print(f"Result: {result}")
+                
+                # Auto-save after each command
+                db.save_to_file()
+                print("✓ Auto-saved to db.pesapal")
+                
+        except Exception as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
