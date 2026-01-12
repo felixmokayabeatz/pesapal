@@ -27,8 +27,8 @@ class RDBMSWrapper:
     
     @classmethod
     def _create_tables(cls, db):
-        """Create initial tables - FIXED VERSION"""
-        print("=== DEBUG: Creating tables ===")
+        """Create initial tables - WITH EMAIL UNIQUENESS"""
+        print("=== DEBUG: Creating tables with email uniqueness ===")
         
         try:
             # First, drop table if it exists (simple approach)
@@ -39,18 +39,18 @@ class RDBMSWrapper:
                 print("DEBUG: No users table to drop")
                 pass
             
-            # Create users table - SIMPLE, no IF NOT EXISTS
-            print("DEBUG: Creating users table...")
+            # Create users table with UNIQUE constraint on email
+            print("DEBUG: Creating users table with UNIQUE email...")
             db.execute_sql("""
                 CREATE TABLE users (
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
-                    email TEXT,
+                    email TEXT UNIQUE,
                     age INTEGER,
                     created_at TEXT
                 )
             """)
-            print("✓ Created 'users' table")
+            print("✓ Created 'users' table with UNIQUE email")
             
             # Test insert
             print("DEBUG: Testing insert...")
@@ -60,9 +60,6 @@ class RDBMSWrapper:
             # Verify
             users = db.execute_sql("SELECT * FROM users")
             print(f"DEBUG: Users in table: {users}")
-            if users:
-                print(f"DEBUG: First user columns: {list(users[0].keys())}")
-                print(f"DEBUG: First user data: {users[0]}")
             
         except Exception as e:
             print(f"✗ Error creating users table: {e}")
@@ -287,10 +284,28 @@ class User:
         return UserManager()
     
     def save(self):
-        """Save user to database"""
+        """Save user to database with error handling for unique constraints"""
         db = RDBMSWrapper.get_db()
         
         print(f"DEBUG User.save(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
+        
+        # Validate email uniqueness (additional check before trying SQL)
+        if self.email:
+            try:
+                # Check if email already exists for other users
+                if self.id:
+                    # For updates: check if email exists for other users
+                    check_sql = f"SELECT id FROM users WHERE email = '{self.email}' AND id != {self.id}"
+                else:
+                    # For inserts: check if email exists at all
+                    check_sql = f"SELECT id FROM users WHERE email = '{self.email}'"
+                
+                existing = db.execute_sql(check_sql)
+                if existing:
+                    raise ValueError(f"Email '{self.email}' is already in use by another user")
+            except Exception as check_error:
+                # If check fails, we'll let the database enforce it
+                print(f"DEBUG: Email check error (will let DB handle): {check_error}")
         
         # Convert ID to string for comparison
         id_str = str(self.id) if self.id is not None else None
@@ -324,9 +339,15 @@ class User:
                     return self
                     
         except Exception as e:
-            print(f"DEBUG: UPDATE failed: {e}")
-            import traceback
-            traceback.print_exc()
+            error_msg = str(e)
+            print(f"DEBUG: UPDATE failed: {error_msg}")
+            
+            # Check if it's a unique constraint violation
+            if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+                raise ValueError(f"Email '{self.email}' is already in use. Please use a different email.")
+            else:
+                # Re-raise other errors
+                raise
         
         # If UPDATE failed or no ID, do INSERT
         print(f"DEBUG: Attempting INSERT for user")
@@ -353,10 +374,15 @@ class User:
             return self
             
         except Exception as e:
-            print(f"Error inserting user: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+            error_msg = str(e)
+            print(f"Error inserting user: {error_msg}")
+            
+            # Check if it's a unique constraint violation
+            if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+                raise ValueError(f"Email '{self.email}' is already in use. Please use a different email.")
+            else:
+                # Re-raise other errors
+                raise
     
     def delete(self):
         """Delete user from database"""
