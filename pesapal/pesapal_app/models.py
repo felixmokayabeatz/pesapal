@@ -27,26 +27,59 @@ class RDBMSWrapper:
     
     @classmethod
     def _create_tables(cls, db):
-        """Create initial tables"""
+        """Create initial tables - FIXED VERSION"""
+        print("=== DEBUG: Creating tables ===")
+        
         try:
-            # Create users table
+            # First, drop table if it exists (simple approach)
+            try:
+                db.execute_sql("DROP TABLE users")
+                print("DEBUG: Dropped existing users table")
+            except:
+                print("DEBUG: No users table to drop")
+                pass
+            
+            # Create users table - SIMPLE, no IF NOT EXISTS
+            print("DEBUG: Creating users table...")
             db.execute_sql("""
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE users (
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
-                    email TEXT UNIQUE,
+                    email TEXT,
                     age INTEGER,
-                    created_at TEXT DEFAULT '2024-01-01'
+                    created_at TEXT
                 )
             """)
             print("✓ Created 'users' table")
+            
+            # Test insert
+            print("DEBUG: Testing insert...")
+            result = db.execute_sql("INSERT INTO users (name, email, age, created_at) VALUES ('Test User', 'test@example.com', 25, '2024-01-01')")
+            print(f"DEBUG: Insert result: {result}")
+            
+            # Verify
+            users = db.execute_sql("SELECT * FROM users")
+            print(f"DEBUG: Users in table: {users}")
+            if users:
+                print(f"DEBUG: First user columns: {list(users[0].keys())}")
+                print(f"DEBUG: First user data: {users[0]}")
+            
         except Exception as e:
-            print(f"Note: {e}")
+            print(f"✗ Error creating users table: {e}")
+            import traceback
+            traceback.print_exc()
         
         try:
-            # Create products table
+            # Same for products
+            try:
+                db.execute_sql("DROP TABLE products")
+                print("DEBUG: Dropped existing products table")
+            except:
+                print("DEBUG: No products table to drop")
+                pass
+            
             db.execute_sql("""
-                CREATE TABLE IF NOT EXISTS products (
+                CREATE TABLE products (
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
                     price REAL,
@@ -55,10 +88,11 @@ class RDBMSWrapper:
                 )
             """)
             print("✓ Created 'products' table")
+            
         except Exception as e:
-            print(f"Note: {e}")
-        
-        # Don't auto-add sample data - let users do it
+            print(f"✗ Error creating products table: {e}")
+            import traceback
+            traceback.print_exc()
     
     @classmethod
     def save_db(cls):
@@ -79,29 +113,65 @@ class UserManager:
         """Get all users"""
         try:
             results = self.db.execute_sql("SELECT * FROM users ORDER BY id")
+            print(f"DEBUG UserManager.all(): Got {len(results)} users from database")
+            
             users = []
-            for row in results:
-                # Convert all keys to lowercase for consistency
-                user_data = {}
+            for i, row in enumerate(results):
+                print(f"DEBUG UserManager.all(): Row {i} = {row}")
+                
+                # Create user with the exact keys from the database
+                # First, normalize the keys to match what User.__init__ expects
+                user_kwargs = {}
+                
                 for key, value in row.items():
-                    user_data[key.lower().replace('_', '')] = value
-                user_data.update(row)  # Keep original keys too
+                    # Store original key
+                    user_kwargs[key] = value
+                    # Also store uppercase version
+                    user_kwargs[key.upper()] = value
+                    # Also store lowercase version
+                    user_kwargs[key.lower()] = value
+                    # Also store version without underscores
+                    clean_key = key.lower().replace('_', '')
+                    user_kwargs[clean_key] = value
+                
+                print(f"DEBUG UserManager.all(): User kwargs = {user_kwargs}")
                 
                 try:
-                    user = User(**user_data)
+                    user = User(**user_kwargs)
                     users.append(user)
-                except:
-                    # Fallback creation
+                except Exception as e:
+                    print(f"DEBUG UserManager.all(): Error creating user: {e}")
+                    # Fallback: create empty user and set attributes manually
                     user = User()
-                    user.id = row.get('ID') or row.get('id') or row.get('_id')
-                    user.name = row.get('NAME') or row.get('name')
-                    user.email = row.get('EMAIL') or row.get('email')
-                    user.age = row.get('AGE') or row.get('age')
-                    user.created_at = row.get('CREATED_AT') or row.get('created_at') or row.get('createdat')
+                    
+                    # Extract data from row using all possible key variations
+                    for key, value in row.items():
+                        key_lower = key.lower()
+                        if key_lower in ['id', '_id']:
+                            user.id = value
+                        elif key_lower in ['name', 'fullname']:
+                            user.name = value or ''
+                        elif key_lower == 'email':
+                            user.email = value or ''
+                        elif key_lower == 'age':
+                            if value is not None and value != '':
+                                try:
+                                    user.age = int(value)
+                                except:
+                                    user.age = None
+                            else:
+                                user.age = None
+                        elif key_lower in ['created_at', 'createdat', 'created']:
+                            user.created_at = value or '2024-01-01'
+                    
                     users.append(user)
+                    print(f"DEBUG UserManager.all(): Fallback user: id={user.id}, name={user.name}, email={user.email}, age={user.age}")
+            
             return users
         except Exception as e:
             print(f"Error getting users: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def filter(self, **kwargs):
@@ -196,11 +266,21 @@ class User:
         self.id = id or ID or _id
         self.name = name or NAME or ''
         self.email = email or EMAIL or ''
-        self.age = age or AGE
+        
+        # Handle age - convert to int if possible
+        age_val = age or AGE
+        if age_val is not None and age_val != '':
+            try:
+                self.age = int(age_val)
+            except (ValueError, TypeError):
+                self.age = None
+        else:
+            self.age = None
+            
         self.created_at = created_at or CREATED_AT or CREATEDAT or createdat or '2024-01-01'
         
-        # Debug
-        print(f"DEBUG User.__init__(): id={self.id}, name={self.name}")
+        # Debug - PRINT ALL FIELDS!
+        print(f"DEBUG User.__init__(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
     
     @classmethod
     def objects(cls):
@@ -212,12 +292,15 @@ class User:
         
         print(f"DEBUG User.save(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
         
+        # Convert ID to string for comparison
+        id_str = str(self.id) if self.id is not None else None
+        
         try:
             # Always try UPDATE first if we have an ID
-            if self.id and str(self.id).isdigit():
+            if id_str and id_str.isdigit():
                 print(f"DEBUG: Attempting UPDATE for user id={self.id}")
                 
-                # Build UPDATE SQL - make it single line
+                # Build UPDATE SQL
                 set_parts = []
                 if self.name:
                     set_parts.append(f"name = '{self.name}'")
@@ -225,8 +308,6 @@ class User:
                     set_parts.append(f"email = '{self.email}'")
                 if self.age is not None:
                     set_parts.append(f"age = {self.age}")
-                else:
-                    set_parts.append("age = NULL")
                 
                 if set_parts:
                     set_clause = ", ".join(set_parts)
@@ -235,36 +316,38 @@ class User:
                     
                     # Execute update
                     result = db.execute_sql(sql)
-                    print(f"DEBUG: UPDATE returned: {result}")
+                    print(f"DEBUG: UPDATE result: {result}")
                     RDBMSWrapper.save_db()
                     return self
-            else:
-                print(f"DEBUG: No valid ID for UPDATE, trying INSERT")
-                
+                else:
+                    print(f"DEBUG: Nothing to update")
+                    return self
+                    
         except Exception as e:
             print(f"DEBUG: UPDATE failed: {e}")
+            import traceback
+            traceback.print_exc()
         
         # If UPDATE failed or no ID, do INSERT
         print(f"DEBUG: Attempting INSERT for user")
         try:
-            # Get next available ID
-            result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
-            max_id = 0
-            if result and isinstance(result, list) and len(result) > 0:
-                max_id_dict = result[0]
-                max_id = max_id_dict.get('max_id', 0) or 0
-                if isinstance(max_id, str) and max_id.isdigit():
-                    max_id = int(max_id)
-            
-            new_id = max_id + 1 if max_id else 1
-            
-            # Create simple single-line INSERT
+            # Don't include ID - let the table auto-generate it
             age_value = f"{self.age}" if self.age is not None else "NULL"
-            sql = f"INSERT INTO users (id, name, email, age, created_at) VALUES ({new_id}, '{self.name}', '{self.email}', {age_value}, '{self.created_at}')"
+            sql = f"INSERT INTO users (name, email, age, created_at) VALUES ('{self.name}', '{self.email}', {age_value}, '{self.created_at}')"
             print(f"DEBUG: INSERT SQL: {sql}")
             
-            db.execute_sql(sql)
-            self.id = new_id
+            result = db.execute_sql(sql)
+            print(f"DEBUG: INSERT returned: {result}")
+            
+            # Get the new ID
+            if isinstance(result, int):
+                self.id = result
+            else:
+                # Try to get the last inserted ID
+                max_result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
+                if max_result and isinstance(max_result, list) and len(max_result) > 0:
+                    self.id = max_result[0].get('max_id', 1)
+            
             RDBMSWrapper.save_db()
             print(f"DEBUG: INSERT successful, new id={self.id}")
             return self
