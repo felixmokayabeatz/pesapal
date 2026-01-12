@@ -162,12 +162,17 @@ class Table:
                     value_str = f"'{value}'"
                 else:
                     value_str = str(value)
-                expression = re.sub(rf'\b{col_name}\b', value_str, expression)
+                # Replace column name in case-insensitive way
+                expression = re.sub(rf'(?i)\b{re.escape(col_name)}\b', value_str, expression)
             
             expression = expression.replace('=', '==').replace('AND', 'and').replace('OR', 'or')
+            # Also handle lowercase and/or
+            expression = expression.replace('and', 'and').replace('or', 'or')
             return eval(expression, {"__builtins__": {}}, {})
-        except:
+        except Exception as e:
+            print(f"DEBUG _evaluate_where error: {e}, expression={expression}")
             return False
+        
     
     def create_index(self, column_name: str):
         if column_name not in self.indexes:
@@ -254,14 +259,17 @@ class Database:
         return self.tables[table_name].insert(row_data)
     
     def _parse_select(self, sql: str) -> List[Dict]:
-        pattern = r'SELECT (.*?) FROM (\w+)(?: WHERE (.*))?'
+        # Updated pattern to handle ORDER BY and LIMIT
+        pattern = r'SELECT (.*?) FROM (\w+)(?: WHERE (.*?))?(?: ORDER BY (.*?))?(?: LIMIT (\d+))?$'
         match = re.match(pattern, sql, re.IGNORECASE)
         if not match:
-            raise ValueError("Invalid SELECT")
+            raise ValueError(f"Invalid SELECT: {sql}")
         
         columns_str = match.group(1)
         table_name = match.group(2)
         where_clause = match.group(3)
+        order_by = match.group(4)
+        limit_str = match.group(5)
         
         if table_name not in self.tables:
             raise ValueError(f"Table {table_name} not found")
@@ -269,11 +277,34 @@ class Database:
         table = self.tables[table_name]
         
         if columns_str == "*":
-            return table.select(where_clause)
+            results = table.select(where_clause)
         else:
             selected = [col.strip() for col in columns_str.split(',')]
             results = table.select(where_clause)
-            return [{col: row.get(col) for col in selected} for row in results]
+            results = [{col: row.get(col) for col in selected} for row in results]
+        
+        # Apply ORDER BY if specified
+        if order_by:
+            # Parse order by clause (simple: "column" or "column DESC")
+            order_parts = order_by.strip().split()
+            column = order_parts[0]
+            descending = len(order_parts) > 1 and order_parts[1].upper() == 'DESC'
+            
+            def sort_key(row):
+                value = row.get(column)
+                # Handle None values
+                if value is None:
+                    return '' if not descending else 'ZZZZZZ'
+                return str(value)
+            
+            results.sort(key=sort_key, reverse=descending)
+        
+        # Apply LIMIT if specified
+        if limit_str:
+            limit = int(limit_str)
+            results = results[:limit]
+        
+        return results
     
     def _parse_update(self, sql: str) -> int:
         pattern = r'UPDATE (\w+) SET (.*?)(?: WHERE (.*))?'
