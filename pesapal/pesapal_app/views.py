@@ -142,3 +142,39 @@ def run_join(request):
         return render(request, 'join_demo.html', {'results': results})
     except Exception as e:
         return render(request, 'join_demo.html', {'error': str(e)})
+    
+
+
+def web_terminal(request):
+    """Web-based SQL terminal"""
+    db = RDBMSWrapper.get_db()
+    
+    if request.method == 'POST':
+        query = request.POST.get('query', '')
+        try:
+            result = db.execute_sql(query)
+            
+            # Format result for display
+            if isinstance(result, list):
+                return JsonResponse({
+                    'success': True,
+                    'type': 'table',
+                    'data': result,
+                    'count': len(result)
+                })
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'type': 'scalar',
+                    'data': result
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    # Get current schema for display
+    schema = db.get_schema()
+    return render(request, 'terminal.html', {'schema': schema})
