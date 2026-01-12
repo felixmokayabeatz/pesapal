@@ -1,10 +1,10 @@
-from pesapal_app.models import RDBMSWrapper
+# @Felix 2026
 
+from pesapal_app.models import RDBMSWrapper
 
 def ensure_join_sample_data(db):
     """Create sample data for JOIN demonstration if needed"""
     try:
-        # Create users table if not exists
         try:
             db.execute_sql("""
                 CREATE TABLE users (
@@ -15,7 +15,6 @@ def ensure_join_sample_data(db):
                 )
             """)
             
-            # Insert sample users
             sample_users = [
                 (1, 'Alice Johnson', 'alice@example.com', 25),
                 (2, 'Bob Smith', 'bob@example.com', 30),
@@ -30,11 +29,10 @@ def ensure_join_sample_data(db):
                         VALUES ({user_id}, '{name}', '{email}', {age})
                     """)
                 except:
-                    pass  # User might already exist
+                    pass
         except:
-            pass  # Table might already exist
+            pass
         
-        # Create orders table if not exists
         try:
             db.execute_sql("""
                 CREATE TABLE orders (
@@ -47,13 +45,12 @@ def ensure_join_sample_data(db):
                 )
             """)
             
-            # Insert sample orders
             sample_orders = [
                 (1, 1, 'Laptop', 1, '2024-01-15', 999.99),
                 (2, 1, 'Mouse', 2, '2024-01-15', 49.98),
                 (3, 2, 'Keyboard', 1, '2024-01-16', 79.99),
                 (4, 2, 'Monitor', 1, '2024-01-17', 299.99),
-                (5, 5, 'Headphones', 1, '2024-01-18', 149.99)  # user_id=5 doesn't exist in users
+                (5, 5, 'Headphones', 1, '2024-01-18', 149.99)
             ]
             
             for order_id, user_id, product, quantity, date, price in sample_orders:
@@ -63,9 +60,9 @@ def ensure_join_sample_data(db):
                         VALUES ({order_id}, {user_id}, '{product}', {quantity}, '{date}', {price})
                     """)
                 except:
-                    pass  # Order might already exist
+                    pass
         except:
-            pass  # Table might already exist
+            pass
         
         RDBMSWrapper.save_db()
         

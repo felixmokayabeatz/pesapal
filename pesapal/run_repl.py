@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-"""REPL with file persistence"""
+# @Felix 2026
+
 import sys
 import os
 
@@ -10,13 +10,13 @@ from pesapal_app.rdbms_core import Database
 def main():
     db = Database("pesapal_db")
     
-    # Try to load from file
+    
     if os.path.exists("db.pesapal"):
         if db.load_from_file():
             print("✓ Loaded from db.pesapal")
         else:
             print("✗ Could not load, starting fresh")
-            # Create sample tables
+            
             try:
                 db.execute_sql("""
                     CREATE TABLE IF NOT EXISTS users (
@@ -53,7 +53,7 @@ def main():
             cmd = input("SQL> ").strip()
             
             if cmd.upper() == 'EXIT':
-                # Save before exiting
+                
                 db.save_to_file()
                 print("Database saved. Goodbye!")
                 break
@@ -89,7 +89,7 @@ Commands:
                 print()
                 
             else:
-                # Execute SQL
+                
                 result = db.execute_sql(cmd)
                 if result is not None:
                     if isinstance(result, list):
@@ -105,7 +105,7 @@ Commands:
                     else:
                         print(f"Result: {result}")
                 
-                # Auto-save after each command
+                
                 db.save_to_file()
                 print("✓ Auto-saved to db.pesapal")
                 

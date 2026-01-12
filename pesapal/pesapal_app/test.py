@@ -1,3 +1,5 @@
+# @Felix 2026
+
 def test_db_columns(request):
     """Test what columns exist in users table"""
     from .models import RDBMSWrapper
@@ -5,7 +7,7 @@ def test_db_columns(request):
     db = RDBMSWrapper.get_db()
     output = []
     
-    # Get one user to see column names
+    
     try:
         users = db.execute_sql("SELECT * FROM users LIMIT 1")
         output.append("<h1>Database Column Test</h1>")
@@ -20,14 +22,14 @@ def test_db_columns(request):
         else:
             output.append("<p>No users in database</p>")
             
-        # Try to insert a test user
+        
         output.append("<h2>Test Insert:</h2>")
         try:
             sql = "INSERT INTO users (name, email, age) VALUES ('Test User', 'test@example.com', 30)"
             result = db.execute_sql(sql)
             output.append(f"<p>Insert result: {result}</p>")
             
-            # Check again
+            
             users = db.execute_sql("SELECT * FROM users ORDER BY id DESC LIMIT 1")
             if users:
                 user = users[0]
