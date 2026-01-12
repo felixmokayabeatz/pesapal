@@ -121,8 +121,10 @@ def add_user(request):
     return render(request, 'add_user.html')
 
 
+# pesapal_app/views.py - Update edit_user view
+
 def edit_user(request, user_id):
-    """Edit a user with error handling"""
+    """Edit a user - handles partial updates"""
     error_message = None
     
     try:
@@ -138,38 +140,41 @@ def edit_user(request, user_id):
             email = request.POST.get('email', '').strip()
             age_str = request.POST.get('age', '').strip()
             
-            # Basic validation
-            if not name:
-                error_message = "Name is required."
-            elif not email:
-                error_message = "Email is required."
-            elif '@' not in email:
-                error_message = "Please enter a valid email address."
+            print(f"DEBUG edit_user: Updating user {user_id}: name='{name}', email='{email}', age='{age_str}'")
             
-            if not error_message:
-                # Update user data
+            # Update only provided fields
+            if name:
                 user.name = name
+            
+            if email:
                 user.email = email
-                user.age = int(age_str) if age_str and age_str.isdigit() else None
-                
-                # Save with error handling
+            
+            if age_str:
                 try:
-                    user.save()
-                    return redirect('users')
-                except ValueError as e:
-                    error_message = str(e)
-                except Exception as e:
-                    error_message = f"Error saving user: {str(e)}"
-            else:
-                # If validation failed, update the user object for the form
-                user.name = name
-                user.email = email
-                user.age = int(age_str) if age_str and age_str.isdigit() else None
+                    user.age = int(age_str)
+                except ValueError:
+                    user.age = None
+            
+            # Save with error handling
+            try:
+                user.save()
+                print(f"DEBUG: User updated successfully")
+                return redirect('users')
+            except ValueError as e:
+                error_message = str(e)
+                print(f"DEBUG: ValueError: {error_message}")
+            except Exception as e:
+                error_message = f"Error saving user: {str(e)}"
+                print(f"DEBUG: Exception: {error_message}")
+                import traceback
+                traceback.print_exc()
         
         return render(request, 'edit_user.html', {'user': user, 'error': error_message})
         
     except Exception as e:
         print(f"Error editing user: {e}")
+        import traceback
+        traceback.print_exc()
         return redirect('users')
 
 
