@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Add User</title>
+    <title>Add Product</title>
     <style>
         body { font-family: Arial; margin: 20px; }
         .container { max-width: 600px; margin: auto; }
         .form-group { margin: 15px 0; }
         label { display: block; margin-bottom: 5px; }
-        input { width: 100%; padding: 8px; }
+        input, select { width: 100%; padding: 8px; }
         .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Add New User</h1>
-        <a href="/users/" class="btn">Back to Users</a>
+        <h1>Add New Product</h1>
+        <a href="/products/" class="btn">Back to Products</a>
         
         <form method="post" style="margin-top: 20px;">
             {% csrf_token %}
@@ -23,14 +23,21 @@
                 <input type="text" name="name" required>
             </div>
             <div class="form-group">
-                <label>Email:</label>
-                <input type="email" name="email" required>
+                <label>Price:</label>
+                <input type="number" step="0.01" name="price" required>
             </div>
             <div class="form-group">
-                <label>Age:</label>
-                <input type="number" name="age">
+                <label>In Stock:</label>
+                <select name="in_stock">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
             </div>
-            <button type="submit" class="btn">Save User</button>
+            <div class="form-group">
+                <label>Category:</label>
+                <input type="text" name="category" required>
+            </div>
+            <button type="submit" class="btn">Save Product</button>
         </form>
     </div>
 </body>

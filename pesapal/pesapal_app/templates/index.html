@@ -1,112 +1,234 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Pesapal RDBMS Demo</title>
-    <style>
-        body { font-family: Arial; margin: 20px; }
-        .container { max-width: 1200px; margin: auto; }
-        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
-        .card { background: white; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
-        .nav { margin: 20px 0; }
-        .nav a { margin-right: 15px; color: #3498db; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Custom RDBMS Demo</h1>
-            <p>Pesapal Junior Developer Challenge 2026</p>
-        </div>
-        
-        <div class="nav">
-            <a href="/" class="btn">Home</a>
-            <a href="/users/" class="btn">Users</a>
-            <a href="/products/" class="btn">Products</a>
-            <a href="/join/" class="btn">JOIN Demo</a>
-        </div>
-        
-        <div class="card">
-            <h2>Database: {{ database_name }}</h2>
-            <p>A custom-built relational database management system implemented in Python.</p>
-            
-            <h3>Database Schema</h3>
-            {% for table_name, table_info in tables.items %}
-            <h4>{{ table_name }} ({{ table_info.row_count }} rows)</h4>
-            <table>
-                <tr>
-                    <th>Column</th>
-                    <th>Type</th>
-                    <th>Constraints</th>
-                </tr>
-                {% for col in table_info.columns %}
-                <tr>
-                    <td>{{ col.name }}</td>
-                    <td>{{ col.type }}</td>
-                    <td>
-                        {% if col.primary %}PRIMARY KEY{% endif %}
-                        {% if col.unique %}UNIQUE{% endif %}
-                        {% if not col.nullable %}NOT NULL{% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% endfor %}
-        </div>
-        
-        <div class="card">
-            <h3>Execute SQL Query</h3>
-            <form id="queryForm">
-                {% csrf_token %}
-                <textarea id="query" rows="4" style="width: 100%; padding: 10px;" 
-                          placeholder="SELECT * FROM users"></textarea>
-                <button type="submit" class="btn">Execute</button>
-            </form>
-            <div id="result" style="margin-top: 20px;"></div>
-        </div>
-        
-        <div class="card">
-            <h3>Features Demonstrated</h3>
-            <ul>
-                <li>Custom RDBMS with SQL interface</li>
-                <li>Interactive REPL mode (run REPL separately)</li>
-                <li>CRUD operations (Create, Read, Update, Delete)</li>
-                <li>Primary keys and unique constraints</li>
-                <li>Basic indexing system</li>
-                <li>Table JOIN operations</li>
-                <li>Django web interface</li>
-            </ul>
+{% extends 'base.html' %}
+
+{% load custom_filters %}
+
+
+{% block title %}Dashboard - PesapalDB{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/terminal/" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-terminal me-1"></i> Open Terminal
+            </a>
         </div>
     </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="number">{{ total_tables }}</div>
+            <div class="label">Tables</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="number">{{ total_rows }}</div>
+            <div class="label">Total Rows</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="number">{{ user_count }}</div>
+            <div class="label">Users</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="number">{{ product_count }}</div>
+            <div class="label">Products</div>
+        </div>
+    </div>
+</div>
+
+<!-- Schema Display -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i> Database Schema</h5>
+    </div>
+    <div class="card-body">
+        {% for table_name, table_info in tables.items %}
+        <div class="mb-4">
+            <h6 class="mb-2">
+                <span class="badge bg-primary me-2">{{ table_name }}</span>
+                <small class="text-muted">{{ table_info.row_count }} rows</small>
+            </h6>
+            <div class="table-container">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th width="20%">Column</th>
+                            <th width="15%">Type</th>
+                            <th width="45%">Constraints</th>
+                            <th width="20%">Sample Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for col in table_info.columns %}
+                        <tr>
+                            <td>
+                                <strong>{{ col.name }}</strong>
+                                {% if col.primary %}
+                                <span class="badge bg-danger ms-1">PK</span>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ col.type }}</code></td>
+                            <td>
+                                {% if col.unique %}
+                                <span class="badge bg-warning text-dark me-1">UNIQUE</span>
+                                {% endif %}
+                                {% if not col.nullable %}
+                                <span class="badge bg-info me-1">NOT NULL</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if table_info.sample_data and col.name in table_info.sample_data %}
+ 
+                                <small class="text-truncate">{{ table_info.sample_data|get_item:col.name|truncatechars:20 }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Quick SQL Query -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-code-slash me-2"></i> Quick SQL Query</h5>
+    </div>
+    <div class="card-body">
+        <form id="quickQueryForm">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="quickQuery" class="form-label">Enter SQL Query:</label>
+                <textarea class="form-control query-input" id="quickQuery" rows="3" 
+                          placeholder="SELECT * FROM users LIMIT 5"></textarea>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="outputFormat" id="formatTable" value="table" checked>
+                        <label class="form-check-label" for="formatTable">Table View</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="outputFormat" id="formatJson" value="json">
+                        <label class="form-check-label" for="formatJson">JSON</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="outputFormat" id="formatRaw" value="raw">
+                        <label class="form-check-label" for="formatRaw">Raw SQL</label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-play-circle me-1"></i> Execute
+                </button>
+            </div>
+        </form>
+        
+        <div id="queryResult" class="mt-3"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('quickQueryForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const query = document.getElementById('quickQuery').value;
+    const format = document.querySelector('input[name="outputFormat"]:checked').value;
+    const resultDiv = document.getElementById('queryResult');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     
-    <script>
-        document.getElementById('queryForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const query = document.getElementById('query').value;
-            const resultDiv = document.getElementById('result');
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            
-            const response = await fetch('/api/query/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    'query': query,
-                    'csrfmiddlewaretoken': csrfToken
-                })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                resultDiv.innerHTML = '<pre>' + JSON.stringify(data.result, null, 2) + '</pre>';
+    resultDiv.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
+    
+    try {
+        const response = await fetch('/api/query/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                'query': query,
+                'format': format,
+                'csrfmiddlewaretoken': csrfToken
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            if (format === 'table' && Array.isArray(data.result)) {
+                // Display as table
+                if (data.result.length > 0) {
+                    let html = `<div class="table-container mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">${data.result.length} row(s) returned</span>
+                            <small class="text-muted">Showing up to 100 rows</small>
+                        </div>
+                        <table class="table table-hover">
+                            <thead><tr>`;
+                    
+                    // Headers
+                    Object.keys(data.result[0]).forEach(key => {
+                        html += `<th>${key}</th>`;
+                    });
+                    html += '</tr></thead><tbody>';
+                    
+                    // Rows (limit to 100)
+                    const maxRows = Math.min(data.result.length, 100);
+                    for (let i = 0; i < maxRows; i++) {
+                        const row = data.result[i];
+                        html += '<tr>';
+                        Object.values(row).forEach(value => {
+                            html += `<td>${value}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                    
+                    html += '</tbody></table>';
+                    
+                    if (data.result.length > 100) {
+                        html += `<div class="alert alert-warning mt-2">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Showing first 100 of ${data.result.length} rows. Use LIMIT clause for more.
+                        </div>`;
+                    }
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-info">Empty result set</div>';
+                }
+            } else if (format === 'json') {
+                // Display as JSON
+                resultDiv.innerHTML = `<pre class="code-block">${JSON.stringify(data.result, null, 2)}</pre>`;
             } else {
-                resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+                // Raw SQL output
+                resultDiv.innerHTML = `<pre class="code-block">${JSON.stringify(data.result)}</pre>`;
             }
-        };
-    </script>
-</body>
-</html>
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ${data.error}
+            </div>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Request failed: ${error}
+        </div>`;
+    }
+};
+</script>
+{% endblock %}

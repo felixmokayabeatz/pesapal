@@ -1,395 +1,551 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PesapalDB - Web Terminal</title>
-    <style>
-        body {
-            font-family: 'Consolas', 'Monaco', monospace;
-            margin: 0;
-            background: #1e1e1e;
-            color: #d4d4d4;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: #007acc;
-            color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .terminal-output {
-            background: #252526;
-            border: 1px solid #3e3e42;
-            border-radius: 5px;
-            padding: 20px;
-            margin-bottom: 20px;
-            height: 400px;
-            overflow-y: auto;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        .terminal-input {
-            display: flex;
-            gap: 10px;
-        }
-        .prompt {
-            color: #4ec9b0;
-            font-weight: bold;
-            white-space: nowrap;
-            padding: 10px 0;
-        }
-        #query-input {
-            flex: 1;
-            background: #252526;
-            border: 1px solid #3e3e42;
-            color: #d4d4d4;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 14px;
-            border-radius: 3px;
-        }
-        #query-input:focus {
-            outline: none;
-            border-color: #007acc;
-        }
-        .btn {
-            background: #007acc;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-family: 'Consolas', monospace;
-        }
-        .btn:hover {
-            background: #005a9e;
-        }
-        .output-line {
-            margin: 5px 0;
-            padding: 2px 0;
-        }
-        .query {
-            color: #569cd6;
-        }
-        .success {
-            color: #4ec9b0;
-        }
-        .error {
-            color: #f44747;
-        }
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-        .table th {
-            background: #2d2d30;
-            color: #9cdcfe;
-            padding: 8px;
-            text-align: left;
-            border: 1px solid #3e3e42;
-        }
-        .table td {
-            padding: 8px;
-            border: 1px solid #3e3e42;
-            color: #ce9178;
-        }
-        .schema-panel {
-            background: #252526;
-            border: 1px solid #3e3e42;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        .schema-table {
-            margin: 10px 0;
-        }
-        .schema-table h4 {
-            color: #4ec9b0;
-            margin: 10px 0 5px 0;
-        }
-        .help-panel {
-            background: #252526;
-            border: 1px solid #3e3e42;
-            border-radius: 5px;
-            padding: 15px;
-            margin-top: 20px;
-        }
-        .help-panel h3 {
-            color: #569cd6;
-            margin-top: 0;
-        }
-        .help-command {
-            color: #dcdcaa;
-            margin: 5px 0;
-        }
-        .nav {
-            margin: 20px 0;
-        }
-        .nav a {
-            color: #569cd6;
-            text-decoration: none;
-            margin-right: 15px;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>PesapalDB - Web Terminal</h1>
-            <p>Interactive SQL interface for Pesapal RDBMS</p>
+{% extends 'base.html' %}
+
+{% block title %}SQL Terminal - PesapalDB{% endblock %}
+
+{% block extra_css %}
+<style>
+    .terminal-container {
+        background: #1e1e1e;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .terminal-header {
+        background: #252526;
+        padding: 1rem;
+        border-bottom: 1px solid #3e3e42;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .terminal-body {
+        padding: 1rem;
+        font-family: 'JetBrains Mono', monospace;
+        color: #d4d4d4;
+        min-height: 500px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .terminal-line {
+        margin: 0.5rem 0;
+        line-height: 1.5;
+    }
+    
+    .terminal-prompt {
+        color: #4ec9b0;
+        font-weight: bold;
+    }
+    
+    .terminal-input {
+        background: transparent;
+        border: none;
+        color: #d4d4d4;
+        font-family: inherit;
+        font-size: inherit;
+        width: calc(100% - 100px);
+        outline: none;
+    }
+    
+    .terminal-query {
+        color: #569cd6;
+    }
+    
+    .terminal-success {
+        color: #4ec9b0;
+    }
+    
+    .terminal-error {
+        color: #f44747;
+    }
+    
+    .terminal-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        background: #252526;
+    }
+    
+    .terminal-table th {
+        background: #2d2d30;
+        color: #9cdcfe;
+        padding: 0.5rem;
+        text-align: left;
+        border: 1px solid #3e3e42;
+    }
+    
+    .terminal-table td {
+        padding: 0.5rem;
+        border: 1px solid #3e3e42;
+        color: #ce9178;
+    }
+    
+    .controls {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+    
+    .history-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .history-item {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        cursor: pointer;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.875rem;
+    }
+    
+    .history-item:hover {
+        background: #f8fafc;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="bi bi-terminal me-2"></i> SQL Terminal
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearTerminal()">
+                <i class="bi bi-trash me-1"></i> Clear
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showHelp()">
+                <i class="bi bi-question-circle me-1"></i> Help
+            </button>
         </div>
-        
-        <div class="nav">
-            <a href="/">Home</a>
-            <a href="/users/">Users</a>
-            <a href="/products/">Products</a>
-            <a href="/terminal/" class="btn">Terminal</a>
-        </div>
-        
-        <div class="schema-panel">
-            <h3>Database Schema</h3>
-            {% for table_name, table_info in schema.tables.items %}
-            <div class="schema-table">
-                <h4>{{ table_name }} ({{ table_info.row_count }} rows)</h4>
-                <table class="table">
-                    <tr>
-                        <th>Column</th>
-                        <th>Type</th>
-                        <th>Constraints</th>
-                    </tr>
-                    {% for col in table_info.columns %}
-                    <tr>
-                        <td>{{ col.name }}</td>
-                        <td>{{ col.type }}</td>
-                        <td>
-                            {% if col.primary %}PRIMARY KEY{% endif %}
-                            {% if col.unique %}UNIQUE{% endif %}
-                            {% if not col.nullable %}NOT NULL{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-9">
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <div>
+                    <span class="text-light">PesapalDB Terminal</span>
+                    <small class="text-muted ms-2">Connected to: {{ schema.name }}</small>
+                </div>
+                <div>
+                    <span class="badge bg-success">●</span>
+                    <span class="text-muted ms-1">Online</span>
+                </div>
             </div>
-            {% endfor %}
-        </div>
-        
-        <div class="terminal-output" id="output">
-            <div class="output-line success">=== Web SQL Terminal ===</div>
-            <div class="output-line">Type SQL commands and press Enter</div>
-            <div class="output-line">Type 'help' for available commands</div>
-            <div class="output-line">Database: {{ schema.name }}</div>
-            <div class="output-line success">Ready!</div>
-        </div>
-        
-        <div class="terminal-input">
-            <div class="prompt">SQL&gt;</div>
-            <input type="text" id="query-input" placeholder="Enter SQL command..." autofocus>
-            <button class="btn" onclick="executeQuery()">Execute</button>
-            <button class="btn" onclick="clearTerminal()">Clear</button>
-        </div>
-        
-        <div class="help-panel">
-            <h3>Available Commands:</h3>
-            <div class="help-command">SELECT * FROM users</div>
-            <div class="help-command">INSERT INTO users (name, email) VALUES ('John', 'john@test.com')</div>
-            <div class="help-command">UPDATE users SET age = 30 WHERE name = 'John'</div>
-            <div class="help-command">DELETE FROM users WHERE id = 1</div>
-            <div class="help-command">CREATE TABLE orders (id INTEGER PRIMARY KEY, ...)</div>
-            <div class="help-command">CREATE INDEX idx_name ON users(name)</div>
-            <div class="help-command">DROP TABLE table_name</div>
-            <div class="help-command">help - Show this help</div>
-            <div class="help-command">clear - Clear terminal</div>
+            <div class="terminal-body" id="terminalOutput">
+                <div class="terminal-line terminal-success">=== PesapalDB SQL Terminal ===</div>
+                <div class="terminal-line">Type SQL commands and press Enter</div>
+                <div class="terminal-line">Type 'help' for available commands</div>
+                <div class="terminal-line terminal-success">Ready!</div>
+            </div>
+            <div class="terminal-header">
+                <span class="terminal-prompt">SQL></span>
+                <input type="text" class="terminal-input" id="terminalInput" 
+                       placeholder="Enter SQL command..." autofocus>
+            </div>
         </div>
     </div>
     
-    <script>
-        const outputDiv = document.getElementById('output');
-        const queryInput = document.getElementById('query-input');
-        const csrfToken = "{{ csrf_token }}";
+    <div class="col-lg-3">
+        <div class="controls">
+            <h6><i class="bi bi-gear me-2"></i> Settings</h6>
+            <div class="mb-3">
+                <label class="form-label">Output Format:</label>
+                <select class="form-select form-select-sm" id="outputFormat">
+                    <option value="table" selected>Table View</option>
+                    <option value="json">JSON</option>
+                    <option value="raw">Raw Output</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Row Limit:</label>
+                <input type="number" class="form-control form-control-sm" id="rowLimit" value="100" min="1" max="1000">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Auto-execute:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="autoExecute" checked>
+                    <label class="form-check-label" for="autoExecute">Execute on Enter</label>
+                </div>
+            </div>
+        </div>
         
-        // Handle Enter key in input
-        queryInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                executeQuery();
-            }
-        });
-        
-        // Command history
-        let commandHistory = [];
-        let historyIndex = -1;
-        
-        // Load previous commands from localStorage
-        const savedHistory = localStorage.getItem('sqlHistory');
-        if (savedHistory) {
-            commandHistory = JSON.parse(savedHistory);
+        <div class="history-panel">
+            <h6><i class="bi bi-clock-history me-2"></i> Command History</h6>
+            <div id="historyList">
+                <!-- History items will be added here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightbulb me-2"></i> Quick Examples</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SELECT * FROM users')">
+                            SELECT * FROM users
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SELECT * FROM products WHERE category = \\'Electronics\\'')">
+                            Filter Products
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('CREATE TABLE test (id INT PRIMARY KEY, name TEXT)')">
+                            Create Table
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SCHEMA')">
+                            Show Schema
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const terminalOutput = document.getElementById('terminalOutput');
+const terminalInput = document.getElementById('terminalInput');
+const outputFormat = document.getElementById('outputFormat');
+const rowLimit = document.getElementById('rowLimit');
+const autoExecute = document.getElementById('autoExecute');
+const csrfToken = "{{ csrf_token }}";
+
+let commandHistory = JSON.parse(localStorage.getItem('pesapalTerminalHistory') || '[]');
+let historyIndex = -1;
+
+// Initialize history display
+updateHistoryDisplay();
+
+terminalInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && autoExecute.checked) {
+        executeCommand();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateHistory(-1);
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateHistory(1);
+    }
+});
+
+function addToHistory(command) {
+    if (command.trim() && !commandHistory.includes(command)) {
+        commandHistory.push(command);
+        if (commandHistory.length > 50) {
+            commandHistory.shift();
         }
-        
-        // Navigate history with arrow keys
-        queryInput.addEventListener('keydown', function(e) {
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (historyIndex < commandHistory.length - 1) {
-                    historyIndex++;
-                    queryInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
-                }
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (historyIndex > 0) {
-                    historyIndex--;
-                    queryInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
-                } else {
-                    historyIndex = -1;
-                    queryInput.value = '';
-                }
-            }
-        });
-        
-        function addToHistory(query) {
-            commandHistory.push(query);
-            if (commandHistory.length > 50) {
-                commandHistory.shift(); // Keep only last 50 commands
-            }
-            localStorage.setItem('sqlHistory', JSON.stringify(commandHistory));
-            historyIndex = -1;
-        }
-        
-        function addOutput(line, className = '') {
-            const lineDiv = document.createElement('div');
-            lineDiv.className = `output-line ${className}`;
-            lineDiv.textContent = line;
-            outputDiv.appendChild(lineDiv);
-            outputDiv.scrollTop = outputDiv.scrollHeight;
-        }
-        
-        function executeQuery() {
-            const query = queryInput.value.trim();
-            if (!query) return;
+        localStorage.setItem('pesapalTerminalHistory', JSON.stringify(commandHistory));
+        updateHistoryDisplay();
+    }
+    historyIndex = -1;
+}
+
+function updateHistoryDisplay() {
+    const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '';
+    
+    commandHistory.slice().reverse().forEach(cmd => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.textContent = cmd.length > 40 ? cmd.substring(0, 40) + '...' : cmd;
+        div.onclick = () => {
+            terminalInput.value = cmd;
+            terminalInput.focus();
+        };
+        historyList.appendChild(div);
+    });
+}
+
+function navigateHistory(direction) {
+    if (commandHistory.length === 0) return;
+    
+    if (direction === -1 && historyIndex < commandHistory.length - 1) {
+        historyIndex++;
+    } else if (direction === 1 && historyIndex > 0) {
+        historyIndex--;
+    } else if (direction === 1 && historyIndex === 0) {
+        historyIndex = -1;
+        terminalInput.value = '';
+        return;
+    }
+    
+    terminalInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
+}
+
+function addTerminalLine(content, className = '') {
+    const line = document.createElement('div');
+    line.className = `terminal-line ${className}`;
+    line.innerHTML = content;
+    terminalOutput.appendChild(line);
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+async function executeCommand() {
+    const command = terminalInput.value.trim();
+    if (!command) return;
+    
+    // Add command to terminal
+    addTerminalLine(`<span class="terminal-prompt">SQL></span> <span class="terminal-query">${command}</span>`);
+    
+    // Handle special commands
+    if (command.toLowerCase() === 'clear') {
+        clearTerminal();
+        terminalInput.value = '';
+        return;
+    }
+    
+    if (command.toLowerCase() === 'help') {
+        showHelp();
+        terminalInput.value = '';
+        return;
+    }
+    
+    // Handle SCHEMA command
+    if (command.toUpperCase() === 'SCHEMA') {
+        try {
+            const response = await fetch('/api/schema/');
+            const data = await response.json();
             
-            // Add query to output
-            addOutput(`SQL> ${query}`, 'query');
-            
-            // Handle special commands
-            if (query.toLowerCase() === 'help') {
-                showHelp();
-                queryInput.value = '';
-                return;
-            }
-            
-            if (query.toLowerCase() === 'clear') {
-                clearTerminal();
-                queryInput.value = '';
-                return;
-            }
-            
-            // Execute via AJAX
-            fetch('/terminal/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRFToken': csrfToken
-                },
-                body: new URLSearchParams({
-                    'query': query
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    if (data.type === 'table') {
-                        // Display as table
-                        if (data.data.length > 0) {
-                            const table = document.createElement('table');
-                            table.className = 'table';
-                            
-                            // Create header
-                            const thead = document.createElement('thead');
-                            const headerRow = document.createElement('tr');
-                            Object.keys(data.data[0]).forEach(key => {
-                                const th = document.createElement('th');
-                                th.textContent = key.toUpperCase();
-                                headerRow.appendChild(th);
-                            });
-                            thead.appendChild(headerRow);
-                            table.appendChild(thead);
-                            
-                            // Create rows
-                            const tbody = document.createElement('tbody');
-                            data.data.forEach(row => {
-                                const tr = document.createElement('tr');
-                                Object.values(row).forEach(value => {
-                                    const td = document.createElement('td');
-                                    td.textContent = value;
-                                    tr.appendChild(td);
-                                });
-                                tbody.appendChild(tr);
-                            });
-                            table.appendChild(tbody);
-                            
-                            const tableContainer = document.createElement('div');
-                            tableContainer.appendChild(table);
-                            outputDiv.appendChild(tableContainer);
-                            
-                            addOutput(`${data.count} row(s) returned`, 'success');
-                        } else {
-                            addOutput('Empty result set', 'success');
-                        }
-                    } else {
-                        addOutput(`Result: ${data.data}`, 'success');
+            if (data.tables) {
+                addTerminalLine('<span class="terminal-success">Database Schema:</span>');
+                for (const [tableName, tableInfo] of Object.entries(data.tables)) {
+                    addTerminalLine(`  <strong>${tableName}</strong> (${tableInfo.row_count} rows):`);
+                    for (const col of tableInfo.columns) {
+                        const constraints = [];
+                        if (col.primary) constraints.push('PK');
+                        if (col.unique) constraints.push('UNIQUE');
+                        if (!col.nullable) constraints.push('NOT NULL');
+                        const constrStr = constraints.length ? ` [${constraints.join(', ')}]` : '';
+                        addTerminalLine(`    ${col.name}: ${col.type}${constrStr}`);
                     }
-                } else {
-                    addOutput(`Error: ${data.error}`, 'error');
                 }
-                
-                // Add to history and clear input
-                addToHistory(query);
-                queryInput.value = '';
-                
-                // Scroll to bottom
-                outputDiv.scrollTop = outputDiv.scrollHeight;
+                addTerminalLine(`<span class="terminal-success">✓ Query successful</span>`);
+            } else {
+                addTerminalLine('<span class="terminal-error">✗ Invalid schema response</span>');
+            }
+        } catch (error) {
+            addTerminalLine(`<span class="terminal-error">✗ Error: ${error}</span>`);
+        }
+        
+        addToHistory(command);
+        terminalInput.value = '';
+        return;
+    }
+    
+    // Execute SQL
+    try {
+        const response = await fetch('/terminal/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken
+            },
+            body: new URLSearchParams({
+                'query': command,
+                'format': outputFormat.value,
+                'limit': rowLimit.value
             })
-            .catch(error => {
-                addOutput(`Request failed: ${error}`, 'error');
-                queryInput.value = '';
-            });
-        }
+        });
         
-        function showHelp() {
-            addOutput('Available SQL Commands:', 'success');
-            addOutput('  SELECT * FROM table_name [WHERE condition]');
-            addOutput('  INSERT INTO table_name (col1, col2) VALUES (val1, val2)');
-            addOutput('  UPDATE table_name SET col=val [WHERE condition]');
-            addOutput('  DELETE FROM table_name [WHERE condition]');
-            addOutput('  CREATE TABLE name (col TYPE [PRIMARY KEY|UNIQUE|NOT NULL], ...)');
-            addOutput('  DROP TABLE table_name');
-            addOutput('  CREATE INDEX idx_name ON table_name(column)');
-            addOutput('');
-            addOutput('Special Commands:', 'success');
-            addOutput('  help  - Show this help');
-            addOutput('  clear - Clear terminal');
-            addOutput('');
-            addOutput('Examples:', 'success');
-            addOutput("  SELECT * FROM users WHERE age > 25");
-            addOutput("  INSERT INTO users (name, email) VALUES ('Alice', 'alice@test.com')");
-            addOutput("  UPDATE products SET price = 99.99 WHERE name = 'Laptop'");
-        }
+        const data = await response.json();
+        console.log('Response:', data); // Debug log
         
-        function clearTerminal() {
-            outputDiv.innerHTML = '';
-            addOutput('Terminal cleared', 'success');
-            addOutput('Type SQL commands and press Enter', '');
-            addOutput('Database: {{ schema.name }}', '');
+        if (data.success) {
+            if (outputFormat.value === 'table' && Array.isArray(data.result)) {
+                displayAsTable(data.result);
+            } else if (outputFormat.value === 'json') {
+                displayAsJson(data.result);
+            } else {
+                // Handle scalar results
+                if (data.result && data.result !== "Query executed successfully") {
+                    addTerminalLine(`Result: ${data.result}`, 'terminal-success');
+                } else {
+                    addTerminalLine(data.result || 'Query executed successfully', 'terminal-success');
+                }
+            }
+            addTerminalLine(`<span class="terminal-success">✓ Query successful</span>`);
+        } else {
+            addTerminalLine(`<span class="terminal-error">✗ Error: ${data.error}</span>`);
         }
+    } catch (error) {
+        addTerminalLine(`<span class="terminal-error">✗ Request failed: ${error}</span>`);
+    }
+    
+    // Add to history and clear input
+    addToHistory(command);
+    terminalInput.value = '';
+}
+
+function displayAsTable(data) {
+    console.log('Displaying table:', data); // Debug
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        addTerminalLine('Empty result set', 'terminal-success');
+        return;
+    }
+    
+    // Check if we have valid data
+    const firstRow = data[0];
+    if (!firstRow || typeof firstRow !== 'object') {
+        // Not tabular data, display as text
+        addTerminalLine(JSON.stringify(data), 'terminal-success');
+        return;
+    }
+    
+    const table = document.createElement('table');
+    table.className = 'terminal-table';
+    
+    // Header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    Object.keys(firstRow).forEach(key => {
+        const th = document.createElement('th');
+        th.textContent = key.toUpperCase();
+        th.style.padding = '8px';
+        th.style.border = '1px solid #3e3e42';
+        th.style.backgroundColor = '#2d2d30';
+        th.style.color = '#9cdcfe';
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Body
+    const tbody = document.createElement('tbody');
+    const limit = parseInt(rowLimit.value);
+    const rowsToShow = Math.min(data.length, limit);
+    
+    for (let i = 0; i < rowsToShow; i++) {
+        const rowData = data[i];
+        const row = document.createElement('tr');
         
-        // Auto-focus on input
-        queryInput.focus();
-    </script>
-</body>
-</html>
+        Object.values(rowData).forEach(value => {
+            const td = document.createElement('td');
+            td.textContent = value !== null && value !== undefined ? value : 'NULL';
+            td.style.padding = '8px';
+            td.style.border = '1px solid #3e3e42';
+            td.style.color = '#ce9178';
+            row.appendChild(td);
+        });
+        
+        tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    
+    // Add table to terminal
+    terminalOutput.appendChild(table);
+    
+    // Show count
+    addTerminalLine(`Showing ${rowsToShow} of ${data.length} row(s)`, 'terminal-success');
+    
+    if (data.length > limit) {
+        addTerminalLine(`Limited to ${limit} rows. Adjust limit for more.`, 'terminal-success');
+    }
+}
+
+function displayAsTable(data) {
+    if (data.length === 0) {
+        addTerminalLine('Empty result set', 'terminal-success');
+        return;
+    }
+    
+    const table = document.createElement('table');
+    table.className = 'terminal-table';
+    
+    // Header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    Object.keys(data[0]).forEach(key => {
+        const th = document.createElement('th');
+        th.textContent = key;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Body (limited by rowLimit)
+    const tbody = document.createElement('tbody');
+    const limit = parseInt(rowLimit.value);
+    const rowsToShow = Math.min(data.length, limit);
+    
+    for (let i = 0; i < rowsToShow; i++) {
+        const row = document.createElement('tr');
+        Object.values(data[i]).forEach(value => {
+            const td = document.createElement('td');
+            td.textContent = value;
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    
+    // Add table to terminal
+    const container = document.createElement('div');
+    container.appendChild(table);
+    terminalOutput.appendChild(container);
+    
+    // Show count
+    addTerminalLine(`Showing ${rowsToShow} of ${data.length} rows`, 'terminal-success');
+    
+    if (data.length > limit) {
+        addTerminalLine(`Limited to ${limit} rows. Adjust limit in settings for more.`, 'terminal-success');
+    }
+}
+
+function displayAsJson(data) {
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'background: #252526; padding: 1rem; border-radius: 4px; margin: 1rem 0;';
+    pre.textContent = JSON.stringify(data, null, 2);
+    terminalOutput.appendChild(pre);
+}
+
+function clearTerminal() {
+    terminalOutput.innerHTML = '';
+    addTerminalLine('<span class="terminal-success">=== PesapalDB SQL Terminal ===</span>');
+    addTerminalLine('Terminal cleared. Type SQL commands and press Enter.');
+}
+
+function showHelp() {
+    addTerminalLine('<span class="terminal-success">Available SQL Commands:</span>');
+    addTerminalLine('  SELECT * FROM table_name [WHERE condition] [LIMIT n]');
+    addTerminalLine('  INSERT INTO table_name (col1, col2) VALUES (val1, val2)');
+    addTerminalLine('  UPDATE table_name SET col=val [WHERE condition]');
+    addTerminalLine('  DELETE FROM table_name [WHERE condition]');
+    addTerminalLine('  CREATE TABLE name (col TYPE [PRIMARY KEY|UNIQUE|NOT NULL], ...)');
+    addTerminalLine('  DROP TABLE table_name');
+    addTerminalLine('  CREATE INDEX idx_name ON table_name(column)');
+    addTerminalLine('  SCHEMA - Show database schema');
+    addTerminalLine('');
+    addTerminalLine('<span class="terminal-success">Terminal Commands:</span>');
+    addTerminalLine('  help  - Show this help');
+    addTerminalLine('  clear - Clear terminal');
+}
+
+function insertExample(sql) {
+    terminalInput.value = sql;
+    terminalInput.focus();
+}
+</script>
+{% endblock %}
