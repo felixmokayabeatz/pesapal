@@ -94,6 +94,8 @@ class Table:
         self.row_count = 0
         self.indexes: Dict[str, Index] = {}
         self.unique_values: Dict[str, set] = {}
+        # Add error tracking for duplicate values
+        self.unique_constraints: Dict[str, set] = {}
     
     def add_column(self, column: Column):
         if column.is_primary or column.is_unique:
@@ -110,19 +112,32 @@ class Table:
                     raise ValueError(f"Invalid type for {col.name}")
                 if not col.nullable and values[col.name] is None:
                     raise ValueError(f"{col.name} cannot be null")
+                
+                # Check unique constraints
+                if col.is_unique or col.is_primary:
+                    value = values[col.name]
+                    if value is not None:
+                        # Check if value already exists
+                        unique_set = self.unique_values.get(col.name, set())
+                        if value in unique_set:
+                            raise ValueError(f"Duplicate value '{value}' for {col.name}")
+                
                 row_data[col.name] = values[col.name]
             elif col.is_primary and col.data_type == DataType.INTEGER:
-                row_data[col.name] = self.row_count + 1
+                # Auto-generate primary key
+                next_id = self.row_count + 1
+                row_data[col.name] = next_id
             else:
                 row_data[col.name] = None
         
-        # Check unique constraints
+        # Check unique constraints (again for auto-generated values)
         for col in self.columns:
-            if col.is_primary or col.is_unique:
+            if (col.is_primary or col.is_unique) and col.name in row_data:
                 value = row_data[col.name]
-                if value in self.unique_values.get(col.name, set()):
-                    raise ValueError(f"Duplicate value for {col.name}")
-                self.unique_values.setdefault(col.name, set()).add(value)
+                if value is not None:
+                    if value in self.unique_values.get(col.name, set()):
+                        raise ValueError(f"Duplicate value for {col.name}")
+                    self.unique_values.setdefault(col.name, set()).add(value)
         
         # Insert
         self.row_count += 1
@@ -144,20 +159,55 @@ class Table:
     
     def update(self, values: Dict[str, Any], where_clause: Optional[str] = None) -> int:
         updated = 0
+        row_indices_to_update = []
+        
+        # First, find which rows to update
         for i, row in enumerate(self.rows):
             if not where_clause or self._evaluate_where(row, where_clause):
-                for col_name, value in values.items():
-                    if col_name in row:
-                        # Update value
-                        old_value = row[col_name]
-                        row[col_name] = value
-                        
-                        # Update indexes
-                        if col_name in self.indexes:
-                            self.indexes[col_name].remove(old_value, i + 1)
-                            self.indexes[col_name].add(value, i + 1)
-                
-                updated += 1
+                row_indices_to_update.append(i)
+        
+        # Check uniqueness constraints before updating
+        for col in self.columns:
+            if col.is_unique and col.name in values:
+                new_value = values[col.name]
+                if new_value is not None:
+                    # Check if this value already exists in other rows
+                    for i in row_indices_to_update:
+                        existing_value = self.rows[i].get(col.name)
+                        if existing_value != new_value:  # Only check if value is changing
+                            # Look for this value in other rows
+                            for j, other_row in enumerate(self.rows):
+                                if j not in row_indices_to_update:  # Not in rows being updated
+                                    if other_row.get(col.name) == new_value:
+                                        raise ValueError(f"Duplicate value '{new_value}' for {col.name}")
+        
+        # Now perform the updates
+        for i in row_indices_to_update:
+            row = self.rows[i]
+            row_id = i + 1
+            
+            for col_name, value in values.items():
+                if col_name in row:
+                    # Store old value for index cleanup
+                    old_value = row[col_name]
+                    
+                    # Update the value
+                    row[col_name] = value
+                    
+                    # Update unique values set
+                    if col_name in self.unique_values:
+                        if old_value is not None and old_value in self.unique_values[col_name]:
+                            self.unique_values[col_name].remove(old_value)
+                        if value is not None:
+                            self.unique_values[col_name].add(value)
+                    
+                    # Update indexes
+                    if col_name in self.indexes:
+                        self.indexes[col_name].remove(old_value, row_id)
+                        self.indexes[col_name].add(value, row_id)
+            
+            updated += 1
+        
         return updated
     
     def delete(self, where_clause: Optional[str] = None) -> int:
