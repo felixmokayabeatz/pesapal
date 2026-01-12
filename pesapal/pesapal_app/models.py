@@ -13,29 +13,18 @@ class RDBMSWrapper:
             cls._instance = Database("pesapal_db")
             
             # Try to load from file
-            if cls._instance.load_from_file():
-                print("Loaded database from db.pesapal")
-            else:
-                # If no file exists, create sample data
-                cls._init_sample_data(cls._instance)
-                print("Created new database")
-                
-                # Save the new database
+            if not cls._instance.load_from_file():
+                print("No db.pesapal file found, creating new database...")
+                # Create tables
+                cls._create_tables(cls._instance)
+                # Save immediately
                 cls._instance.save_to_file()
         
         return cls._instance
     
     @classmethod
-    def save_db(cls):
-        """Save database to file"""
-        if cls._instance:
-            cls._instance.save_to_file()
-            return True
-        return False
-    
-    @classmethod
-    def _init_sample_data(cls, db):
-        """Initialize with sample tables if they don't exist"""
+    def _create_tables(cls, db):
+        """Create initial tables"""
         try:
             # Create users table
             db.execute_sql("""
@@ -47,14 +36,9 @@ class RDBMSWrapper:
                     created_at TEXT
                 )
             """)
-            
-            # Insert sample users
-            db.execute_sql("INSERT INTO users (name, email, age, created_at) VALUES ('John Doe', 'john@example.com', 25, '2024-01-15')")
-            db.execute_sql("INSERT INTO users (name, email, age, created_at) VALUES ('Jane Smith', 'jane@example.com', 30, '2024-01-16')")
-            
-        except Exception:
-            # Tables might already exist
-            pass
+            print("✓ Created 'users' table")
+        except Exception as e:
+            print(f"Note: {e}")
         
         try:
             # Create products table
@@ -67,15 +51,34 @@ class RDBMSWrapper:
                     category TEXT
                 )
             """)
-            
+            print("✓ Created 'products' table")
+        except Exception as e:
+            print(f"Note: {e}")
+        
+        try:
+            # Insert sample users
+            db.execute_sql("INSERT INTO users (name, email, age, created_at) VALUES ('John Doe', 'john@example.com', 25, '2024-01-15')")
+            db.execute_sql("INSERT INTO users (name, email, age, created_at) VALUES ('Jane Smith', 'jane@example.com', 30, '2024-01-16')")
+            print("✓ Added sample users")
+        except Exception as e:
+            print(f"Note: {e}")
+        
+        try:
             # Insert sample products
             db.execute_sql("INSERT INTO products (name, price, in_stock, category) VALUES ('Laptop', 999.99, TRUE, 'Electronics')")
             db.execute_sql("INSERT INTO products (name, price, in_stock, category) VALUES ('Book', 19.99, TRUE, 'Books')")
             db.execute_sql("INSERT INTO products (name, price, in_stock, category) VALUES ('Headphones', 79.99, FALSE, 'Electronics')")
-            
-        except Exception:
-            # Tables might already exist
-            pass
+            print("✓ Added sample products")
+        except Exception as e:
+            print(f"Note: {e}")
+    
+    @classmethod
+    def save_db(cls):
+        """Save database to file"""
+        if cls._instance:
+            cls._instance.save_to_file()
+            return True
+        return False
 
 
 class User:
