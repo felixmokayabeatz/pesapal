@@ -1,5 +1,3 @@
-<!--@ Felix 2026-->
-
 {% extends 'base.html' %}
 
 {% block title %}SQL Terminal - PesapalDB{% endblock %}
@@ -10,6 +8,7 @@
         background: #1e1e1e;
         border-radius: 12px;
         overflow: hidden;
+        margin-top: 1rem;
     }
     
     .terminal-header {
@@ -23,16 +22,17 @@
     
     .terminal-body {
         padding: 1rem;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'Courier New', monospace;
         color: #d4d4d4;
-        min-height: 500px;
-        max-height: 70vh;
+        height: 500px;
         overflow-y: auto;
     }
     
     .terminal-line {
         margin: 0.5rem 0;
         line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
     }
     
     .terminal-prompt {
@@ -46,8 +46,9 @@
         color: #d4d4d4;
         font-family: inherit;
         font-size: inherit;
-        width: calc(100% - 100px);
+        flex: 1;
         outline: none;
+        padding-left: 0.5rem;
     }
     
     .terminal-query {
@@ -67,6 +68,7 @@
         border-collapse: collapse;
         margin: 1rem 0;
         background: #252526;
+        font-size: 0.9rem;
     }
     
     .terminal-table th {
@@ -75,6 +77,7 @@
         padding: 0.5rem;
         text-align: left;
         border: 1px solid #3e3e42;
+        font-weight: 600;
     }
     
     .terminal-table td {
@@ -88,6 +91,7 @@
         padding: 1rem;
         border-radius: 8px;
         margin-top: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .history-panel {
@@ -95,20 +99,52 @@
         border-radius: 8px;
         padding: 1rem;
         margin-top: 1rem;
-        max-height: 200px;
+        height: 300px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .history-list {
+        flex: 1;
         overflow-y: auto;
+        margin-top: 0.5rem;
     }
     
     .history-item {
-        padding: 0.25rem 0;
+        padding: 0.5rem;
         border-bottom: 1px solid #e2e8f0;
         cursor: pointer;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'Courier New', monospace;
         font-size: 0.875rem;
+        transition: background-color 0.2s;
     }
     
     .history-item:hover {
         background: #f8fafc;
+    }
+    
+    .terminal-input-container {
+        display: flex;
+        align-items: center;
+        padding: 0 1rem 1rem;
+        background: #252526;
+    }
+    
+    .query-status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .query-status.success {
+        background-color: #4ec9b0;
+    }
+    
+    .query-status.error {
+        background-color: #f44747;
     }
 </style>
 {% endblock %}
@@ -135,12 +171,12 @@
         <div class="terminal-container">
             <div class="terminal-header">
                 <div>
-                    <span class="text-light">PesapalDB Terminal</span>
+                    <span class="text-light fw-bold">PesapalDB Terminal</span>
                     <small class="text-muted ms-2">Connected to: {{ schema.name }}</small>
                 </div>
-                <div>
-                    <span class="badge bg-success">●</span>
-                    <span class="text-muted ms-1" style="color: #fff !important;">Online</span>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-success rounded-circle p-1 me-1"></span>
+                    <span class="text-light">Online</span>
                 </div>
             </div>
             <div class="terminal-body" id="terminalOutput">
@@ -149,43 +185,52 @@
                 <div class="terminal-line">Type 'help' for available commands</div>
                 <div class="terminal-line terminal-success">Ready!</div>
             </div>
-            <div class="terminal-header">
+            <div class="terminal-input-container">
                 <span class="terminal-prompt">SQL></span>
                 <input type="text" class="terminal-input" id="terminalInput" 
-                       placeholder="Enter SQL command..." autofocus>
+                       placeholder="Enter SQL command..." autofocus
+                       onkeydown="handleTerminalKey(event)">
             </div>
         </div>
     </div>
     
     <div class="col-lg-3">
         <div class="controls">
-            <h6><i class="bi bi-gear me-2"></i> Settings</h6>
+            <h6 class="mb-3">
+                <i class="bi bi-gear me-2"></i> Settings
+            </h6>
             <div class="mb-3">
-                <label class="form-label">Output Format:</label>
+                <label class="form-label small mb-1">Output Format:</label>
                 <select class="form-select form-select-sm" id="outputFormat">
-                    <option value="table" selected>Table View</option>
+                    <option value="table">Table View</option>
                     <option value="json">JSON</option>
                     <option value="raw">Raw Output</option>
                 </select>
             </div>
             <div class="mb-3">
-                <label class="form-label">Row Limit:</label>
-                <input type="number" class="form-control form-control-sm" id="rowLimit" value="100" min="1" max="1000">
+                <label class="form-label small mb-1">Row Limit:</label>
+                <input type="number" class="form-control form-control-sm" 
+                       id="rowLimit" value="100" min="1" max="1000">
             </div>
             <div class="mb-3">
-                <label class="form-label">Auto-execute:</label>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="autoExecute" checked>
-                    <label class="form-check-label" for="autoExecute">Execute on Enter</label>
+                <label class="form-label small mb-1">Auto History:</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" 
+                           id="autoHistory" checked>
+                    <label class="form-check-label small" for="autoHistory">
+                        Save to history
+                    </label>
                 </div>
             </div>
         </div>
         
         <div class="history-panel">
-            <h6><i class="bi bi-clock-history me-2"></i> Command History</h6>
-            <div id="historyList">
-                <!-- History items will be added here -->
-            </div>
+            <h6 class="mb-2">
+                <i class="bi bi-clock-history me-2"></i> Command History
+                <button class="btn btn-sm btn-outline-secondary float-end py-0" 
+                        onclick="clearHistory()">Clear</button>
+            </h6>
+            <div class="history-list" id="historyList"></div>
         </div>
     </div>
 </div>
@@ -194,27 +239,33 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-lightbulb me-2"></i> Quick Examples</h6>
+                <h6 class="mb-0">
+                    <i class="bi bi-lightbulb me-2"></i> Quick Examples
+                </h6>
             </div>
             <div class="card-body">
-                <div class="row">
+                <div class="row g-2">
                     <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SELECT * FROM users')">
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="insertExample('SELECT * FROM users')">
                             SELECT * FROM users
                         </button>
                     </div>
                     <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SELECT * FROM products WHERE category = \\'Electronics\\'')">
-                            Filter Products
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('CREATE TABLE test (id INT PRIMARY KEY, name TEXT)')">
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="insertExample('CREATE TABLE test (id INT PRIMARY KEY, name TEXT)')">
                             Create Table
                         </button>
                     </div>
                     <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="insertExample('SCHEMA')">
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="insertExample('INSERT INTO users (name, email) VALUES (\\'Test\\', \\'test@example.com\\')')">
+                            Insert Data
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="insertExample('SCHEMA')">
                             Show Schema
                         </button>
                     </div>
@@ -231,17 +282,15 @@ const terminalOutput = document.getElementById('terminalOutput');
 const terminalInput = document.getElementById('terminalInput');
 const outputFormat = document.getElementById('outputFormat');
 const rowLimit = document.getElementById('rowLimit');
-const autoExecute = document.getElementById('autoExecute');
+const autoHistory = document.getElementById('autoHistory');
 const csrfToken = "{{ csrf_token }}";
 
 let commandHistory = JSON.parse(localStorage.getItem('pesapalTerminalHistory') || '[]');
 let historyIndex = -1;
+let currentHistory = [];
 
-// Initialize history display
-updateHistoryDisplay();
-
-terminalInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && autoExecute.checked) {
+function handleTerminalKey(e) {
+    if (e.key === 'Enter') {
         executeCommand();
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -250,15 +299,21 @@ terminalInput.addEventListener('keydown', function(e) {
         e.preventDefault();
         navigateHistory(1);
     }
-});
+}
 
 function addToHistory(command) {
-    if (command.trim() && !commandHistory.includes(command)) {
-        commandHistory.push(command);
-        if (commandHistory.length > 50) {
-            commandHistory.shift();
+    if (command.trim() && autoHistory.checked) {
+        if (!commandHistory.includes(command)) {
+            commandHistory.push(command);
+            if (commandHistory.length > 100) {
+                commandHistory.shift();
+            }
+            localStorage.setItem('pesapalTerminalHistory', JSON.stringify(commandHistory));
         }
-        localStorage.setItem('pesapalTerminalHistory', JSON.stringify(commandHistory));
+        currentHistory.push(command);
+        if (currentHistory.length > 10) {
+            currentHistory.shift();
+        }
         updateHistoryDisplay();
     }
     historyIndex = -1;
@@ -268,10 +323,15 @@ function updateHistoryDisplay() {
     const historyList = document.getElementById('historyList');
     historyList.innerHTML = '';
     
-    commandHistory.slice().reverse().forEach(cmd => {
+    const recentHistory = commandHistory.slice(-20).reverse();
+    
+    recentHistory.forEach(cmd => {
         const div = document.createElement('div');
         div.className = 'history-item';
-        div.textContent = cmd.length > 40 ? cmd.substring(0, 40) + '...' : cmd;
+        div.innerHTML = `
+            <div class="query-status success"></div>
+            <span class="text-truncate">${escapeHtml(cmd.substring(0, 60))}</span>
+        `;
         div.onclick = () => {
             terminalInput.value = cmd;
             terminalInput.focus();
@@ -280,20 +340,28 @@ function updateHistoryDisplay() {
     });
 }
 
+function clearHistory() {
+    commandHistory = [];
+    currentHistory = [];
+    localStorage.removeItem('pesapalTerminalHistory');
+    updateHistoryDisplay();
+}
+
 function navigateHistory(direction) {
-    if (commandHistory.length === 0) return;
+    if (currentHistory.length === 0) return;
     
-    if (direction === -1 && historyIndex < commandHistory.length - 1) {
-        historyIndex++;
+    if (direction === -1) {
+        if (historyIndex < currentHistory.length - 1) {
+            historyIndex++;
+            terminalInput.value = currentHistory[currentHistory.length - 1 - historyIndex];
+        }
     } else if (direction === 1 && historyIndex > 0) {
         historyIndex--;
+        terminalInput.value = currentHistory[currentHistory.length - 1 - historyIndex];
     } else if (direction === 1 && historyIndex === 0) {
         historyIndex = -1;
         terminalInput.value = '';
-        return;
     }
-    
-    terminalInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
 }
 
 function addTerminalLine(content, className = '') {
@@ -304,14 +372,18 @@ function addTerminalLine(content, className = '') {
     terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 async function executeCommand() {
     const command = terminalInput.value.trim();
     if (!command) return;
     
-    // Add command to terminal
-    addTerminalLine(`<span class="terminal-prompt">SQL></span> <span class="terminal-query">${command}</span>`);
+    addTerminalLine(`<span class="terminal-prompt">SQL></span> <span class="terminal-query">${escapeHtml(command)}</span>`);
     
-    // Handle special commands
     if (command.toLowerCase() === 'clear') {
         clearTerminal();
         terminalInput.value = '';
@@ -324,7 +396,6 @@ async function executeCommand() {
         return;
     }
     
-    // Handle SCHEMA command
     if (command.toUpperCase() === 'SCHEMA') {
         try {
             const response = await fetch('/api/schema/');
@@ -356,7 +427,6 @@ async function executeCommand() {
         return;
     }
     
-    // Execute SQL
     try {
         const response = await fetch('/terminal/', {
             method: 'POST',
@@ -372,7 +442,6 @@ async function executeCommand() {
         });
         
         const data = await response.json();
-        console.log('Response:', data); // Debug log
         
         if (data.success) {
             if (outputFormat.value === 'table' && Array.isArray(data.result)) {
@@ -380,11 +449,11 @@ async function executeCommand() {
             } else if (outputFormat.value === 'json') {
                 displayAsJson(data.result);
             } else {
-                // Handle scalar results
-                if (data.result && data.result !== "Query executed successfully") {
-                    addTerminalLine(`Result: ${data.result}`, 'terminal-success');
+                const result = data.result || 'Query executed successfully';
+                if (typeof result === 'string') {
+                    addTerminalLine(result, 'terminal-success');
                 } else {
-                    addTerminalLine(data.result || 'Query executed successfully', 'terminal-success');
+                    addTerminalLine(JSON.stringify(result), 'terminal-success');
                 }
             }
             addTerminalLine(`<span class="terminal-success">✓ Query successful</span>`);
@@ -395,23 +464,18 @@ async function executeCommand() {
         addTerminalLine(`<span class="terminal-error">✗ Request failed: ${error}</span>`);
     }
     
-    // Add to history and clear input
     addToHistory(command);
     terminalInput.value = '';
 }
 
 function displayAsTable(data) {
-    console.log('Displaying table:', data); // Debug
-    
     if (!data || !Array.isArray(data) || data.length === 0) {
         addTerminalLine('Empty result set', 'terminal-success');
         return;
     }
     
-    // Check if we have valid data
     const firstRow = data[0];
     if (!firstRow || typeof firstRow !== 'object') {
-        // Not tabular data, display as text
         addTerminalLine(JSON.stringify(data), 'terminal-success');
         return;
     }
@@ -419,22 +483,16 @@ function displayAsTable(data) {
     const table = document.createElement('table');
     table.className = 'terminal-table';
     
-    // Header
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     Object.keys(firstRow).forEach(key => {
         const th = document.createElement('th');
-        th.textContent = key.toUpperCase();
-        th.style.padding = '8px';
-        th.style.border = '1px solid #3e3e42';
-        th.style.backgroundColor = '#2d2d30';
-        th.style.color = '#9cdcfe';
+        th.textContent = key;
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
     
-    // Body
     const tbody = document.createElement('tbody');
     const limit = parseInt(rowLimit.value);
     const rowsToShow = Math.min(data.length, limit);
@@ -446,9 +504,6 @@ function displayAsTable(data) {
         Object.values(rowData).forEach(value => {
             const td = document.createElement('td');
             td.textContent = value !== null && value !== undefined ? value : 'NULL';
-            td.style.padding = '8px';
-            td.style.border = '1px solid #3e3e42';
-            td.style.color = '#ce9178';
             row.appendChild(td);
         });
         
@@ -456,69 +511,18 @@ function displayAsTable(data) {
     }
     table.appendChild(tbody);
     
-    // Add table to terminal
     terminalOutput.appendChild(table);
     
-    // Show count
     addTerminalLine(`Showing ${rowsToShow} of ${data.length} row(s)`, 'terminal-success');
     
     if (data.length > limit) {
-        addTerminalLine(`Limited to ${limit} rows. Adjust limit for more.`, 'terminal-success');
-    }
-}
-
-function displayAsTable(data) {
-    if (data.length === 0) {
-        addTerminalLine('Empty result set', 'terminal-success');
-        return;
-    }
-    
-    const table = document.createElement('table');
-    table.className = 'terminal-table';
-    
-    // Header
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    Object.keys(data[0]).forEach(key => {
-        const th = document.createElement('th');
-        th.textContent = key;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    
-    // Body (limited by rowLimit)
-    const tbody = document.createElement('tbody');
-    const limit = parseInt(rowLimit.value);
-    const rowsToShow = Math.min(data.length, limit);
-    
-    for (let i = 0; i < rowsToShow; i++) {
-        const row = document.createElement('tr');
-        Object.values(data[i]).forEach(value => {
-            const td = document.createElement('td');
-            td.textContent = value;
-            row.appendChild(td);
-        });
-        tbody.appendChild(row);
-    }
-    table.appendChild(tbody);
-    
-    // Add table to terminal
-    const container = document.createElement('div');
-    container.appendChild(table);
-    terminalOutput.appendChild(container);
-    
-    // Show count
-    addTerminalLine(`Showing ${rowsToShow} of ${data.length} rows`, 'terminal-success');
-    
-    if (data.length > limit) {
-        addTerminalLine(`Limited to ${limit} rows. Adjust limit in settings for more.`, 'terminal-success');
+        addTerminalLine(`Limited to ${limit} rows`, 'terminal-success');
     }
 }
 
 function displayAsJson(data) {
     const pre = document.createElement('pre');
-    pre.style.cssText = 'background: #252526; padding: 1rem; border-radius: 4px; margin: 1rem 0;';
+    pre.style.cssText = 'background: #252526; padding: 1rem; border-radius: 4px; margin: 1rem 0; white-space: pre-wrap;';
     pre.textContent = JSON.stringify(data, null, 2);
     terminalOutput.appendChild(pre);
 }
@@ -530,24 +534,26 @@ function clearTerminal() {
 }
 
 function showHelp() {
-    addTerminalLine('<span class="terminal-success">Available SQL Commands:</span>');
-    addTerminalLine('  SELECT * FROM table_name [WHERE condition] [LIMIT n]');
+    addTerminalLine('<span class="terminal-success">SQL Commands:</span>');
+    addTerminalLine('  SELECT * FROM table_name [WHERE condition]');
     addTerminalLine('  INSERT INTO table_name (col1, col2) VALUES (val1, val2)');
     addTerminalLine('  UPDATE table_name SET col=val [WHERE condition]');
     addTerminalLine('  DELETE FROM table_name [WHERE condition]');
     addTerminalLine('  CREATE TABLE name (col TYPE [PRIMARY KEY|UNIQUE|NOT NULL], ...)');
     addTerminalLine('  DROP TABLE table_name');
     addTerminalLine('  CREATE INDEX idx_name ON table_name(column)');
-    addTerminalLine('  SCHEMA - Show database schema');
     addTerminalLine('');
-    addTerminalLine('<span class="terminal-success">Terminal Commands:</span>');
+    addTerminalLine('<span class="terminal-success">Special Commands:</span>');
+    addTerminalLine('  SCHEMA - Show database schema');
     addTerminalLine('  help  - Show this help');
     addTerminalLine('  clear - Clear terminal');
 }
 
 function insertExample(sql) {
-    terminalInput.value = sql;
+    terminalInput.value = sql.replace(/\\'/g, "'");
     terminalInput.focus();
 }
+
+updateHistoryDisplay();
 </script>
 {% endblock %}

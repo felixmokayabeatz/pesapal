@@ -1,155 +1,245 @@
-<!--@ Felix 2026-->
+{% extends 'base.html' %}
 
+{% block title %}JOIN Demo - PesapalDB{% endblock %}
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>JOIN Demo - PesapalDB</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1400px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .btn { display: inline-block; padding: 10px 15px; margin: 5px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
-        .btn.active { background: #2c3e50; }
-        .btn:hover { background: #2980b9; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; position: sticky; top: 0; }
-        tr:hover { background-color: #f9f9f9; }
-        .stats { display: flex; gap: 20px; margin: 20px 0; padding: 15px; background: #e8f4fc; border-radius: 5px; }
-        .stat-box { flex: 1; text-align: center; padding: 15px; background: white; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .sql-demo { background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0; }
-        .error { color: red; padding: 20px; background: #ffe6e6; border-radius: 5px; }
-        .null-cell { color: #999; font-style: italic; }
-        .users-col { background: #e8f6ff; }
-        .orders-col { background: #fff0e8; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📊 JOIN Operation Demo</h1>
-        <a href="/" class="btn">🏠 Home</a>
-        <a href="/terminal/" class="btn">💻 SQL Terminal</a>
-        
-        {% if error %}
-        <div class="error">
-            <h3>Error:</h3>
-            <p>{{ error }}</p>
-        </div>
-        {% else %}
-        
-        <div class="stats">
-            <div class="stat-box">
-                <h3>JOIN Type</h3>
-                <h2>{{ join_type }} JOIN</h2>
-            </div>
-            <div class="stat-box">
-                <h3>Total Rows</h3>
-                <h2>{{ total_rows }}</h2>
-            </div>
-            <div class="stat-box">
-                <h3>Users with Orders</h3>
-                <h2>{{ users_with_orders }}</h2>
-            </div>
-            <div class="stat-box">
-                <h3>Orders with Users</h3>
-                <h2>{{ orders_with_users }}</h2>
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="bi bi-shuffle me-2"></i> JOIN Demo
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-group me-2">
+                <a href="/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-house me-1"></i> Dashboard
+                </a>
+                <a href="/terminal/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-terminal me-1"></i> SQL Terminal
+                </a>
             </div>
         </div>
-        
-        <h3>Try Different JOIN Types:</h3>
-        <div>
-            {% for type in join_types %}
-            <a href="?type={{ type }}" class="btn {% if type == join_type %}active{% endif %}">
-                {{ type }} JOIN
-            </a>
-            {% endfor %}
-        </div>
-        
-        <div class="sql-demo">
-            <h3>SQL Equivalent:</h3>
-            <pre>SELECT * 
-FROM users 
-{{ join_type }} JOIN orders ON users.id = orders.user_id</pre>
-            
-            <h3>What This Means:</h3>
-            <ul>
-                {% if join_type == 'INNER' %}
-                <li>Returns only users who have orders AND orders that have users</li>
-                <li>Excludes: Users without orders AND orders without users</li>
-                {% elif join_type == 'LEFT' %}
-                <li>Returns ALL users, with their orders if they have any</li>
-                <li>Users without orders appear with NULL order columns</li>
-                {% elif join_type == 'RIGHT' %}
-                <li>Returns ALL orders, with their users if they exist</li>
-                <li>Orders without users appear with NULL user columns</li>
-                {% elif join_type == 'FULL' %}
-                <li>Returns ALL users AND ALL orders</li>
-                <li>Missing matches appear as NULLs</li>
-                {% elif join_type == 'CROSS' %}
-                <li>Returns EVERY combination of users and orders</li>
-                <li>No relationship needed - just all possible pairs</li>
-                {% endif %}
-            </ul>
-        </div>
-        
-        <h3>Results ({{ results|length }} rows):</h3>
-        {% if results %}
-        <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <!-- Dynamically generate headers -->
-                        {% for key in results.0.keys %}
-                        <th class="{% if 'users.' in key %}users-col{% elif 'orders.' in key %}orders-col{% endif %}">
-                            {{ key }}
-                        </th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in results %}
-                    <tr>
-                        {% for key, value in row.items %}
-                        <td class="{% if value is None %}null-cell{% endif %}">
-                            {% if value is None %}
-                            NULL
-                            {% else %}
-                            {{ value }}
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p>No results found.</p>
-        {% endif %}
-        
-        <h3>Sample Data Overview:</h3>
-        <div style="display: flex; gap: 20px; margin: 20px 0;">
-            <div style="flex: 1;">
-                <h4>👥 Users Table</h4>
-                <ul>
-                    <li>Alice Johnson (ID: 1)</li>
-                    <li>Bob Smith (ID: 2)</li>
-                    <li>Charlie Brown (ID: 3)</li>
-                    <li>Diana Prince (ID: 4)</li>
-                </ul>
-            </div>
-            <div style="flex: 1;">
-                <h4>🛒 Orders Table</h4>
-                <ul>
-                    <li>Order 1: Laptop (User: 1)</li>
-                    <li>Order 2: Mouse (User: 1)</li>
-                    <li>Order 3: Keyboard (User: 2)</li>
-                    <li>Order 4: Monitor (User: 2)</li>
-                    <li>Order 5: Headphones (User: 5) ← User doesn't exist!</li>
-                </ul>
-            </div>
-        </div>
-        {% endif %}
     </div>
-</body>
-</html>
+
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <h4 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Error</h4>
+        <p>{{ error }}</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% else %}
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">JOIN Type</h6>
+                    <h3 class="card-title text-primary">{{ join_type }} JOIN</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Rows</h6>
+                    <h3 class="card-title text-success">{{ total_rows }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Users with Orders</h6>
+                    <h3 class="card-title text-info">{{ users_with_orders }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Orders with Users</h6>
+                    <h3 class="card-title text-warning">{{ orders_with_users }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-filter me-2"></i>JOIN Type Selector</h5>
+        </div>
+        <div class="card-body">
+            <div class="btn-group" role="group" aria-label="JOIN types">
+                {% for type in join_types %}
+                <a href="?type={{ type }}" 
+                   class="btn {% if type == join_type %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="bi bi-arrow-left-right me-1"></i>{{ type }} JOIN
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-code-slash me-2"></i>SQL Equivalent</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>SELECT * 
+FROM users 
+{{ join_type }} JOIN orders ON users.id = orders.user_id</code></pre>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>What This Means</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% if join_type == 'INNER' %}
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Returns only users who have orders AND orders that have users
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-x-circle text-danger me-2"></i>
+                            Excludes: Users without orders AND orders without users
+                        </li>
+                        {% elif join_type == 'LEFT' %}
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Returns ALL users, with their orders if they have any
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-dash-circle text-warning me-2"></i>
+                            Users without orders appear with NULL order columns
+                        </li>
+                        {% elif join_type == 'RIGHT' %}
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Returns ALL orders, with their users if they exist
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-dash-circle text-warning me-2"></i>
+                            Orders without users appear with NULL user columns
+                        </li>
+                        {% elif join_type == 'FULL' %}
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Returns ALL users AND ALL orders
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-dash-circle text-warning me-2"></i>
+                            Missing matches appear as NULLs
+                        </li>
+                        {% elif join_type == 'CROSS' %}
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success me-2"></i>
+                            Returns EVERY combination of users and orders
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-arrow-left-right text-info me-2"></i>
+                            No relationship needed - just all possible pairs
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-table me-2"></i>Results ({{ results|length }} rows)</h5>
+            <span class="badge bg-primary">{{ results|length }} rows</span>
+        </div>
+        <div class="card-body">
+            {% if results %}
+            <div class="table-responsive" style="max-height: 500px;">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            {% for key in results.0.keys %}
+                            <th class="{% if 'users.' in key %}table-primary{% elif 'orders.' in key %}table-info{% endif %}">
+                                {% if 'users.' in key %}
+                                <i class="bi bi-person me-1"></i>
+                                {% elif 'orders.' in key %}
+                                <i class="bi bi-cart me-1"></i>
+                                {% endif %}
+                                {{ key }}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in results %}
+                        <tr>
+                            {% for key, value in row.items %}
+                            <td class="{% if value is None %}text-muted fst-italic{% endif %}">
+                                {% if value is None %}
+                                <span class="badge bg-secondary">NULL</span>
+                                {% else %}
+                                {{ value }}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-table text-muted" style="font-size: 3rem;"></i>
+                <h4 class="mt-3 text-muted">No Results Found</h4>
+                <p class="text-muted">Try a different JOIN type or create some data first</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const nullCells = document.querySelectorAll('.text-muted.fst-italic');
+        nullCells.forEach(cell => {
+            cell.addEventListener('mouseenter', function() {
+                this.classList.add('bg-warning', 'bg-opacity-10');
+            });
+            cell.addEventListener('mouseleave', function() {
+                this.classList.remove('bg-warning', 'bg-opacity-10');
+            });
+        });
+
+        const joinButtons = document.querySelectorAll('.btn-group .btn');
+        const joinTooltips = {
+            'INNER': 'Only matching rows from both tables',
+            'LEFT': 'All rows from users + matching orders',
+            'RIGHT': 'All rows from orders + matching users', 
+            'FULL': 'All rows from both tables',
+            'CROSS': 'All possible combinations'
+        };
+
+        joinButtons.forEach(button => {
+            const joinType = button.textContent.replace(' JOIN', '').trim();
+            if (joinTooltips[joinType]) {
+                button.setAttribute('title', joinTooltips[joinType]);
+                button.setAttribute('data-bs-toggle', 'tooltip');
+            }
+        });
+
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+    });
+</script>
+{% endblock %}
+
+{% endblock %}
