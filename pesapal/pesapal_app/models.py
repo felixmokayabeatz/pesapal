@@ -1,3 +1,5 @@
+# pesapal_app/models.py
+
 """
 Django models that interface with our custom RDBMS
 """
@@ -208,55 +210,70 @@ class User:
         """Save user to database"""
         db = RDBMSWrapper.get_db()
         
-        if self.id and self.id != 'None':
-            # Update existing user
-            try:
-                # First check if user exists
-                users = User.objects().filter(id=self.id)
-                if users:
-                    # Update
-                    set_parts = []
-                    if self.name:
-                        set_parts.append(f"name = '{self.name}'")
-                    if self.email:
-                        set_parts.append(f"email = '{self.email}'")
-                    if self.age is not None:
-                        set_parts.append(f"age = {self.age}")
-                    
-                    if set_parts:
-                        set_clause = ", ".join(set_parts)
-                        sql = f"UPDATE users SET {set_clause} WHERE id = {self.id}"
-                        db.execute_sql(sql)
-                        RDBMSWrapper.save_db()
-                else:
-                    # Insert as new
-                    self.id = None
-                    return self.save()
-            except Exception as e:
-                print(f"Error updating user: {e}")
-                return None
-        else:
-            # Insert new user
-            try:
-                # Get next available ID
-                result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
-                max_id = result[0]['max_id'] if result and result[0].get('max_id') else 0
-                new_id = max_id + 1 if max_id else 1
-                
-                sql = f"""
-                    INSERT INTO users (id, name, email, age, created_at) 
-                    VALUES ({new_id}, '{self.name}', '{self.email}', 
-                            {self.age if self.age is not None else 'NULL'}, 
-                            '{self.created_at}')
-                """
-                db.execute_sql(sql)
-                self.id = new_id
-                RDBMSWrapper.save_db()
-            except Exception as e:
-                print(f"Error inserting user: {e}")
-                return None
+        print(f"DEBUG User.save(): id={self.id}, name={self.name}, email={self.email}, age={self.age}")
         
-        return self
+        try:
+            # Always try UPDATE first if we have an ID
+            if self.id and str(self.id).isdigit():
+                print(f"DEBUG: Attempting UPDATE for user id={self.id}")
+                
+                # Build UPDATE SQL - make it single line
+                set_parts = []
+                if self.name:
+                    set_parts.append(f"name = '{self.name}'")
+                if self.email:
+                    set_parts.append(f"email = '{self.email}'")
+                if self.age is not None:
+                    set_parts.append(f"age = {self.age}")
+                else:
+                    set_parts.append("age = NULL")
+                
+                if set_parts:
+                    set_clause = ", ".join(set_parts)
+                    sql = f"UPDATE users SET {set_clause} WHERE id = {self.id}"
+                    print(f"DEBUG: UPDATE SQL: {sql}")
+                    
+                    # Execute update
+                    result = db.execute_sql(sql)
+                    print(f"DEBUG: UPDATE returned: {result}")
+                    RDBMSWrapper.save_db()
+                    return self
+            else:
+                print(f"DEBUG: No valid ID for UPDATE, trying INSERT")
+                
+        except Exception as e:
+            print(f"DEBUG: UPDATE failed: {e}")
+        
+        # If UPDATE failed or no ID, do INSERT
+        print(f"DEBUG: Attempting INSERT for user")
+        try:
+            # Get next available ID
+            result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
+            max_id = 0
+            if result and isinstance(result, list) and len(result) > 0:
+                max_id_dict = result[0]
+                max_id = max_id_dict.get('max_id', 0) or 0
+                if isinstance(max_id, str) and max_id.isdigit():
+                    max_id = int(max_id)
+            
+            new_id = max_id + 1 if max_id else 1
+            
+            # Create simple single-line INSERT
+            age_value = f"{self.age}" if self.age is not None else "NULL"
+            sql = f"INSERT INTO users (id, name, email, age, created_at) VALUES ({new_id}, '{self.name}', '{self.email}', {age_value}, '{self.created_at}')"
+            print(f"DEBUG: INSERT SQL: {sql}")
+            
+            db.execute_sql(sql)
+            self.id = new_id
+            RDBMSWrapper.save_db()
+            print(f"DEBUG: INSERT successful, new id={self.id}")
+            return self
+            
+        except Exception as e:
+            print(f"Error inserting user: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def delete(self):
         """Delete user from database"""
