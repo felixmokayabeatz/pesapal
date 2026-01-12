@@ -9,6 +9,7 @@
         border-radius: 12px;
         overflow: hidden;
         margin-top: 1rem;
+        font-size: 0.8em;
     }
     
     .terminal-header {
@@ -24,8 +25,9 @@
         padding: 1rem;
         font-family: 'Courier New', monospace;
         color: #d4d4d4;
-        height: 500px;
+        height:28em;
         overflow-y: auto;
+        overflow-anchor: none;
     }
     
     .terminal-line {
@@ -68,7 +70,7 @@
         border-collapse: collapse;
         margin: 1rem 0;
         background: #252526;
-        font-size: 0.9rem;
+        font-size: 0.8em;
     }
     
     .terminal-table th {
@@ -92,6 +94,9 @@
         border-radius: 8px;
         margin-top: 1rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        height: calc(100% - 1rem);
+        display: flex;
+        flex-direction: column;
     }
     
     .history-panel {
@@ -116,7 +121,7 @@
         border-bottom: 1px solid #e2e8f0;
         cursor: pointer;
         font-family: 'Courier New', monospace;
-        font-size: 0.875rem;
+        font-size: 0.7em;
         transition: background-color 0.2s;
     }
     
@@ -146,12 +151,90 @@
     .query-status.error {
         background-color: #f44747;
     }
+    
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #4ec9b0;
+        box-shadow: 0 0 8px rgba(78, 201, 176, 0.8);
+    }
+    
+    /* Enhanced Quick Examples styling */
+    .quick-examples-card {
+        height: 100%;
+        min-height: 250px;
+    }
+    
+    .quick-examples-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        height: 100%;
+    }
+    
+    .example-btn {
+        height: 100%;
+        min-height: 70px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 15px !important;
+        text-align: center;
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.4;
+    }
+    
+    .example-btn i {
+        font-size: 1.2em;
+        margin-bottom: 8px;
+    }
+    
+    .example-description {
+        font-size: 0.75em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    .example-btn:hover .example-description {
+        color: #ffffff;
+    }
+    
+    /* Make the right column taller */
+    .col-lg-3 {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 150px);
+    }
+    
+    .col-lg-3 > div {
+        flex-shrink: 0;
+    }
+    
+    .col-lg-3 > .controls {
+        flex: 0 0 auto;
+    }
+    
+    .col-lg-3 > .history-panel {
+        flex: 1;
+        height: auto;
+        min-height: 200px;
+        margin-top: 1rem;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">
+    <h1 class="h3">
         <i class="bi bi-terminal me-2"></i>PesapalDB SQL Terminal
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
@@ -166,16 +249,16 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row" style="min-height: calc(100vh - 200px);">
     <div class="col-lg-9">
         <div class="terminal-container">
             <div class="terminal-header">
                 <div>
                     <span class="text-light fw-bold">PesapalDB Terminal</span>
-                    <small class="text-muted ms-2">Connected to: {{ schema.name }}</small>
+                    <small class="text-muted ms-2">Connected to: {{ schema.name|default:"pesapal_db" }}</small>
                 </div>
-                <div class="d-flex align-items-center">
-                    <span class="badge bg-success rounded-circle p-1 me-1"></span>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
                     <span class="text-light">Online</span>
                 </div>
             </div>
@@ -183,6 +266,7 @@
                 <div class="terminal-line terminal-success">=== PesapalDB SQL Terminal ===</div>
                 <div class="terminal-line">Type SQL commands and press Enter</div>
                 <div class="terminal-line">Type 'help' for available commands</div>
+                <div>Scroll down to see and click Quick Examples</div>
                 <div class="terminal-line terminal-success">Ready!</div>
             </div>
             <div class="terminal-input-container">
@@ -190,6 +274,87 @@
                 <input type="text" class="terminal-input" id="terminalInput" 
                        placeholder="Enter SQL command..." autofocus
                        onkeydown="handleTerminalKey(event)">
+            </div>
+        </div>
+        
+        <!-- Moved Quick Examples here to cover the space below terminal -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card quick-examples-card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-lightbulb me-2"></i> Quick Examples
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="quick-examples-grid">
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('SELECT * FROM users')">
+                                    <i class="bi bi-eye"></i>
+                                    SELECT * FROM users
+                                    <div class="example-description">View all users</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('SELECT * FROM products')">
+                                    <i class="bi bi-box"></i>
+                                    SELECT * FROM products
+                                    <div class="example-description">View all products</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,age INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);')">
+                                    <i class="bi bi-table"></i>
+                                    Create New Table
+                                    <div class="example-description">Create a test table</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('INSERT INTO users (name, email, is_active) VALUES (\\'John Doe\\', \\'john@example.com\\', true)')">
+                                    <i class="bi bi-plus-circle"></i>
+                                    Insert Data
+                                    <div class="example-description">Add new user</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('UPDATE users SET is_active = true WHERE email = \\'john@example.com\\'')">
+                                    <i class="bi bi-pencil"></i>
+                                    Update Data
+                                    <div class="example-description">Modify user status</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('SELECT users.name, orders.total FROM users JOIN orders ON users.id = orders.user_id')">
+                                    <i class="bi bi-shuffle"></i>
+                                    JOIN Example
+                                    <div class="example-description">Combine tables</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('SELECT COUNT(*) as total_users, AVG(age) as avg_age FROM users')">
+                                    <i class="bi bi-calculator"></i>
+                                    Aggregate Functions
+                                    <div class="example-description">Count & average</div>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary w-100 example-btn" 
+                                        onclick="insertExample('SCHEMA')">
+                                    <i class="bi bi-diagram-3"></i>
+                                    Show Schema
+                                    <div class="example-description">View database structure</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -213,13 +378,10 @@
                        id="rowLimit" value="100" min="1" max="1000">
             </div>
             <div class="mb-3">
-                <label class="form-label small mb-1">Auto History:</label>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" 
-                           id="autoHistory" checked>
-                    <label class="form-check-label small" for="autoHistory">
-                        Save to history
-                    </label>
+                <label class="form-label small mb-1">Auto-execute:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="autoExecute" checked>
+                    <label class="form-check-label" for="autoExecute">Execute on Enter</label>
                 </div>
             </div>
         </div>
@@ -234,63 +396,44 @@
         </div>
     </div>
 </div>
-
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-lightbulb me-2"></i> Quick Examples
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100" 
-                                onclick="insertExample('SELECT * FROM users')">
-                            SELECT * FROM users
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100" 
-                                onclick="insertExample('CREATE TABLE test (id INT PRIMARY KEY, name TEXT)')">
-                            Create Table
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100" 
-                                onclick="insertExample('INSERT INTO users (name, email) VALUES (\\'Test\\', \\'test@example.com\\')')">
-                            Insert Data
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-sm btn-outline-primary w-100" 
-                                onclick="insertExample('SCHEMA')">
-                            Show Schema
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
-{% block extra_js %}
+{% block page_js %}
 <script>
 const terminalOutput = document.getElementById('terminalOutput');
 const terminalInput = document.getElementById('terminalInput');
 const outputFormat = document.getElementById('outputFormat');
 const rowLimit = document.getElementById('rowLimit');
-const autoHistory = document.getElementById('autoHistory');
+const autoExecute = document.getElementById('autoExecute');
 const csrfToken = "{{ csrf_token }}";
 
 let commandHistory = JSON.parse(localStorage.getItem('pesapalTerminalHistory') || '[]');
 let historyIndex = -1;
-let currentHistory = [];
+
+// FORCE terminal to stay at TOP - multiple attempts
+terminalOutput.scrollTop = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    terminalOutput.scrollTop = 0;
+    updateHistoryDisplay();
+    terminalInput.focus();
+});
+
+window.addEventListener('load', function() {
+    terminalOutput.scrollTop = 0;
+});
+
+// Extra safeguard
+setTimeout(function() {
+    terminalOutput.scrollTop = 0;
+}, 0);
+
+setTimeout(function() {
+    terminalOutput.scrollTop = 0;
+}, 100);
 
 function handleTerminalKey(e) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && autoExecute.checked) {
         executeCommand();
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -302,18 +445,12 @@ function handleTerminalKey(e) {
 }
 
 function addToHistory(command) {
-    if (command.trim() && autoHistory.checked) {
-        if (!commandHistory.includes(command)) {
-            commandHistory.push(command);
-            if (commandHistory.length > 100) {
-                commandHistory.shift();
-            }
-            localStorage.setItem('pesapalTerminalHistory', JSON.stringify(commandHistory));
+    if (command.trim() && !commandHistory.includes(command)) {
+        commandHistory.push(command);
+        if (commandHistory.length > 50) {
+            commandHistory.shift();
         }
-        currentHistory.push(command);
-        if (currentHistory.length > 10) {
-            currentHistory.shift();
-        }
+        localStorage.setItem('pesapalTerminalHistory', JSON.stringify(commandHistory));
         updateHistoryDisplay();
     }
     historyIndex = -1;
@@ -323,15 +460,10 @@ function updateHistoryDisplay() {
     const historyList = document.getElementById('historyList');
     historyList.innerHTML = '';
     
-    const recentHistory = commandHistory.slice(-20).reverse();
-    
-    recentHistory.forEach(cmd => {
+    commandHistory.slice().reverse().forEach(cmd => {
         const div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = `
-            <div class="query-status success"></div>
-            <span class="text-truncate">${escapeHtml(cmd.substring(0, 60))}</span>
-        `;
+        div.textContent = cmd.length > 40 ? cmd.substring(0, 40) + '...' : cmd;
         div.onclick = () => {
             terminalInput.value = cmd;
             terminalInput.focus();
@@ -340,28 +472,20 @@ function updateHistoryDisplay() {
     });
 }
 
-function clearHistory() {
-    commandHistory = [];
-    currentHistory = [];
-    localStorage.removeItem('pesapalTerminalHistory');
-    updateHistoryDisplay();
-}
-
 function navigateHistory(direction) {
-    if (currentHistory.length === 0) return;
+    if (commandHistory.length === 0) return;
     
-    if (direction === -1) {
-        if (historyIndex < currentHistory.length - 1) {
-            historyIndex++;
-            terminalInput.value = currentHistory[currentHistory.length - 1 - historyIndex];
-        }
+    if (direction === -1 && historyIndex < commandHistory.length - 1) {
+        historyIndex++;
     } else if (direction === 1 && historyIndex > 0) {
         historyIndex--;
-        terminalInput.value = currentHistory[currentHistory.length - 1 - historyIndex];
     } else if (direction === 1 && historyIndex === 0) {
         historyIndex = -1;
         terminalInput.value = '';
+        return;
     }
+    
+    terminalInput.value = commandHistory[commandHistory.length - 1 - historyIndex];
 }
 
 function addTerminalLine(content, className = '') {
@@ -369,6 +493,8 @@ function addTerminalLine(content, className = '') {
     line.className = `terminal-line ${className}`;
     line.innerHTML = content;
     terminalOutput.appendChild(line);
+    
+    // Auto-scroll to bottom to show new content
     terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
@@ -513,6 +639,9 @@ function displayAsTable(data) {
     
     terminalOutput.appendChild(table);
     
+    // Auto-scroll after adding table
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    
     addTerminalLine(`Showing ${rowsToShow} of ${data.length} row(s)`, 'terminal-success');
     
     if (data.length > limit) {
@@ -525,12 +654,26 @@ function displayAsJson(data) {
     pre.style.cssText = 'background: #252526; padding: 1rem; border-radius: 4px; margin: 1rem 0; white-space: pre-wrap;';
     pre.textContent = JSON.stringify(data, null, 2);
     terminalOutput.appendChild(pre);
+    
+    // Auto-scroll after adding JSON
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
 function clearTerminal() {
     terminalOutput.innerHTML = '';
     addTerminalLine('<span class="terminal-success">=== PesapalDB SQL Terminal ===</span>');
     addTerminalLine('Terminal cleared. Type SQL commands and press Enter.');
+    
+    // Scroll to top after clearing
+    terminalOutput.scrollTop = 0;
+}
+
+function clearHistory() {
+    if (confirm('Clear command history?')) {
+        commandHistory = [];
+        localStorage.removeItem('pesapalTerminalHistory');
+        updateHistoryDisplay();
+    }
 }
 
 function showHelp() {
@@ -553,7 +696,5 @@ function insertExample(sql) {
     terminalInput.value = sql.replace(/\\'/g, "'");
     terminalInput.focus();
 }
-
-updateHistoryDisplay();
 </script>
 {% endblock %}
