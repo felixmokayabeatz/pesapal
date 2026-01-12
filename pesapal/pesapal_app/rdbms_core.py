@@ -24,14 +24,35 @@ class DataType:
     def validate(data_type: str, value: Any) -> bool:
         if value is None:
             return True
+        
+        # Special handling for INTEGER type
         if data_type == DataType.INTEGER:
-            return isinstance(value, int)
+            # Allow integers, strings that can be converted to integers, or numeric strings
+            if isinstance(value, int):
+                return True
+            elif isinstance(value, str):
+                # Check if it's a string that can be converted to int
+                if value.isdigit():
+                    return True
+                # Also check for negative numbers
+                if value.startswith('-') and value[1:].isdigit():
+                    return True
+                # Check if it's a string representation of a number
+                try:
+                    int(value)
+                    return True
+                except ValueError:
+                    return False
+            elif isinstance(value, float) and value.is_integer():
+                return True
+            return False
+        
         elif data_type == DataType.TEXT:
             return isinstance(value, str)
         elif data_type == DataType.REAL:
-            return isinstance(value, (int, float))
+            return isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit())
         elif data_type == DataType.BOOLEAN:
-            return isinstance(value, bool) or value in (0, 1, '0', '1', True, False)
+            return isinstance(value, bool) or value in (0, 1, '0', '1', True, False, 'TRUE', 'FALSE', 'true', 'false')
         elif data_type == DataType.DATE:
             return isinstance(value, str)
         return False
@@ -317,7 +338,9 @@ class Database:
         return results
     
     def _parse_update(self, sql: str) -> int:
-        pattern = r'UPDATE (\w+) SET (.*?)(?: WHERE (.*))?'
+        # Clean the SQL first
+        sql = self._clean_sql(sql)
+        pattern = r'UPDATE (\w+) SET (.*?)(?: WHERE (.*))?$'
         match = re.match(pattern, sql, re.IGNORECASE)
         if not match:
             raise ValueError(f"Invalid UPDATE: {sql}")
@@ -330,13 +353,34 @@ class Database:
             raise ValueError(f"Table {table_name} not found")
         
         updates = {}
-        for assignment in set_clause.split(','):
-            assignment = assignment.strip()
-            if '=' in assignment:
-                col, value = assignment.split('=', 1)  # Split only on first '='
-                updates[col.strip()] = self._parse_value(value.strip())
-            else:
-                raise ValueError(f"Invalid assignment: {assignment}")
+        # Split by comma, but handle commas inside quotes
+        assignments = []
+        current = ""
+        in_quotes = False
+        
+        for char in set_clause:
+            if char == "'" and not in_quotes:
+                in_quotes = True
+            elif char == "'" and in_quotes:
+                in_quotes = False
+            elif char == ',' and not in_quotes:
+                assignments.append(current.strip())
+                current = ""
+                continue
+            current += char
+        
+        if current:
+            assignments.append(current.strip())
+        
+        for assignment in assignments:
+            if assignment and '=' in assignment:
+                parts = assignment.split('=', 1)  # Split only on first '='
+                if len(parts) == 2:
+                    col = parts[0].strip()
+                    value = parts[1].strip()
+                    updates[col] = self._parse_value(value)
+                else:
+                    raise ValueError(f"Invalid assignment: {assignment}")
         
         return self.tables[table_name].update(updates, where_clause)
     
