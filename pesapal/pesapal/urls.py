@@ -1,10 +1,7 @@
-"""
-URL configuration for pesapal project.
-"""
-from django.contrib import admin
+# @Felix 2026
+
 from django.urls import path, include
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
     path('', include('pesapal_app.urls')),
 ]
