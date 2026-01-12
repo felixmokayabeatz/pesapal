@@ -144,28 +144,61 @@ class UserManager:
     def get(self, **kwargs):
         """Get a single user matching conditions"""
         print(f"DEBUG UserManager.get(): kwargs={kwargs}")
-        users = self.filter(**kwargs)
-        print(f"DEBUG UserManager.get(): found {len(users)} users")
-        if users:
-            user = users[0]
-            print(f"DEBUG UserManager.get(): returning user id={user.id}, name={user.name}")
-            return user
-        else:
-            print(f"DEBUG UserManager.get(): no user found")
+        
+        try:
+            # Simple approach: get all and filter
+            all_users = self.all()
+            print(f"DEBUG: Found {len(all_users)} total users")
+            
+            for user in all_users:
+                match = True
+                for key, value in kwargs.items():
+                    # Get the attribute (handle case-insensitive)
+                    attr_value = None
+                    
+                    # Try different attribute names
+                    for attr_name in [key.lower(), key.upper(), key]:
+                        if hasattr(user, attr_name):
+                            attr_value = getattr(user, attr_name)
+                            break
+                    
+                    if attr_value is None:
+                        match = False
+                        break
+                    
+                    # Compare values
+                    if str(attr_value) != str(value):
+                        match = False
+                        break
+                
+                if match:
+                    print(f"DEBUG: Found matching user: id={user.id}")
+                    return user
+            
+            print(f"DEBUG: No matching user found")
             return None
-
+            
+        except Exception as e:
+            print(f"DEBUG UserManager.get(): Exception: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
 class User:
     """User model"""
     
     def __init__(self, id=None, ID=None, name=None, NAME=None, email=None, EMAIL=None, 
-                 age=None, AGE=None, created_at=None, CREATED_AT=None, _id=None):
+                 age=None, AGE=None, created_at=None, CREATED_AT=None, CREATEDAT=None, 
+                 createdat=None, _id=None):
         # Handle all possible column name variations
         self.id = id or ID or _id
         self.name = name or NAME or ''
         self.email = email or EMAIL or ''
         self.age = age or AGE
-        self.created_at = created_at or CREATED_AT or '2024-01-01'
+        self.created_at = created_at or CREATED_AT or CREATEDAT or createdat or '2024-01-01'
+        
+        # Debug
+        print(f"DEBUG User.__init__(): id={self.id}, name={self.name}")
     
     @classmethod
     def objects(cls):
