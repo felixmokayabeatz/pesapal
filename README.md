@@ -1,12 +1,11 @@
 # PesapalDB Custom SQL (Python - Django)
 
+This is a **Simple Custom Relational Database Management System (RDBMS)** written in Python where you can store data in a relational database with custom queries. It comes with a web app written using **Django** for easier execution. Easy to use with examples.
 
+> - Main purpose of this project is to showcase the custom RDBMS and the web app to access it.
 
-This is a **Simple Custom Relational Database Management System (RDBMS)** written in python where you can store data in a relational database, custom queries. It comes with a web app written using **django** for easier execution. Easy to use with exanples.
+It stores data in a file named **db.pesapal** when you start the app.
 
-> - Main purpose of thes project is to showcase the the custom RDBMS and the web app to access it.
-
-It stores data in file like named **db.pesapal** when you start the app.
 ---
 
 ## ⚡ Tech Stack 
@@ -21,22 +20,21 @@ It stores data in file like named **db.pesapal** when you start the app.
 ---
 
 ## 📦 Installation & Setup
----
+
 ### 1️⃣ Clone the repository
 ```bash
 git clone https://github.com/felixmokayabeatz/pesapal.git
 cd pesapal
-# Default Brach (main)
+# Default Branch (main)
 ```
 
 ---
 
-## 2️⃣ Create and Acticvate the virtual environment (I will move to docker sooner to make setup easier)
+## 2️⃣ Create and Activate the virtual environment (I will move to Docker soon to make setup easier)
 
-> - For uniformity and easier colloboration use the exact names of the virtual environment names below. If you create with another name add them to gitignore
+> - For uniformity and easier collaboration use the exact names of the virtual environment names below. If you create with another name add them to gitignore
 
-#### On windows example
-
+#### On Windows example
 ```bash
 # Create
 python -m venv pesapal_v_env
@@ -45,7 +43,6 @@ pesapal_v_env\Scripts\activate
 ```
 
 #### On Linux/macOS
-
 ```bash
 # Create
 python3 -m venv pesapal_v_env
@@ -56,33 +53,33 @@ source pesapal_v_env/bin/activate
 
 ---
 
-## 3️⃣ Install the Depedencies/Packages
-
+## 3️⃣ Install the Dependencies/Packages
 ```bash
 pip install -r requirements.txt
 ```
+
 ---
 
 ## Running the project
-
 ```bash
 cd pesapal
 python manage.py runserver
 
-# The directory where manager.py is located id where you run the 'python manage.py runserver'.
-
+# The directory where manage.py is located is where you run the 'python manage.py runserver'.
 ```
-The visit 👉http://127.0.0.1:8000 on your browser
+
+Then visit 👉 http://127.0.0.1:8000 on your browser
 
 ---
 
-## You can also use a normal terminal to access the RDBMS (Optional just works exactly like the web version)
+## You can also use a normal terminal to access the RDBMS (Optional - works exactly like the web version)
 
- > Make sure you are on the root of the project where [run_repl.py](./pesapal/run_repl.py) and run it using the following command.
-
+> Make sure you are on the root of the project where [run_repl.py](./pesapal/run_repl.py) is located and run it using the following command.
 ```bash
-    python run_repl.py
+python run_repl.py
 ```
+
+---
 
 # Demo gif and screenshots
 
@@ -97,6 +94,8 @@ The visit 👉http://127.0.0.1:8000 on your browser
 ![3](./assets/screenshots/3.png)
 ![4](./assets/screenshots/4.png)
 ![5](./assets/screenshots/5.png)
-![5](./assets/screenshots/6.png)
+![6](./assets/screenshots/6.png)
+
+---
 
 ## Thank You ✌️
