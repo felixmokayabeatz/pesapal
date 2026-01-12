@@ -143,8 +143,16 @@ class UserManager:
     
     def get(self, **kwargs):
         """Get a single user matching conditions"""
+        print(f"DEBUG UserManager.get(): kwargs={kwargs}")
         users = self.filter(**kwargs)
-        return users[0] if users else None
+        print(f"DEBUG UserManager.get(): found {len(users)} users")
+        if users:
+            user = users[0]
+            print(f"DEBUG UserManager.get(): returning user id={user.id}, name={user.name}")
+            return user
+        else:
+            print(f"DEBUG UserManager.get(): no user found")
+            return None
 
 
 class User:
