@@ -69,94 +69,107 @@ def users_view(request):
     })
 
 
+# pesapal_app/views.py - Update add_user and edit_user views
+
 def add_user(request):
-    """Add a new user"""
+    """Add a new user with error handling"""
+    error_message = None
+    
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         email = request.POST.get('email', '').strip()
         age_str = request.POST.get('age', '').strip()
         
-        db = RDBMSWrapper.get_db()
+        # Basic validation
+        if not name:
+            error_message = "Name is required."
+        elif not email:
+            error_message = "Email is required."
+        elif '@' not in email:
+            error_message = "Please enter a valid email address."
         
-        try:
-            # Prepare values
-            email_value = f"'{email}'" if email else "NULL"
-            
-            if age_str and age_str.isdigit():
-                age_value = int(age_str)
-            else:
-                age_value = "NULL"
-            
-            # CRITICAL: Don't include ID, let RDBMS auto-generate it
-            # Also use proper SQL formatting
-            sql = f"INSERT INTO users (name, email, age, created_at) VALUES ('{name}', {email_value}, {age_value}, '2024-01-15')"
-            
-            print(f"DEBUG add_user SQL: {sql}")
-            result = db.execute_sql(sql)
-            print(f"DEBUG add_user result: {result}")
-            RDBMSWrapper.save_db()
-            
-            print(f"✓ User added: name='{name}', email='{email}', age={age_str}")
-            return redirect('users')
-            
-        except Exception as e:
-            print(f"✗ Error in add_user: {e}")
-            import traceback
-            traceback.print_exc()
-            return render(request, 'add_user.html', {
-                'error': str(e),
-                'name': name,
-                'email': email,
-                'age': age_str
-            })
+        if not error_message:
+            try:
+                # Create user object
+                user = User()
+                user.name = name
+                user.email = email
+                user.age = int(age_str) if age_str and age_str.isdigit() else None
+                user.created_at = '2024-01-15'  # Default value
+                
+                # Save with error handling
+                try:
+                    user.save()
+                    print(f"✓ User added: name='{name}', email='{email}'")
+                    return redirect('users')
+                except ValueError as e:
+                    error_message = str(e)
+                except Exception as e:
+                    error_message = f"Error saving user: {str(e)}"
+                    
+            except Exception as e:
+                error_message = f"Error creating user: {str(e)}"
+        
+        # Return with error and form data
+        return render(request, 'add_user.html', {
+            'error': error_message,
+            'name': name,
+            'email': email,
+            'age': age_str
+        })
     
     return render(request, 'add_user.html')
 
 
 def edit_user(request, user_id):
-    """Edit a user"""
-    print(f"DEBUG: edit_user called with user_id={user_id}")
-    
+    """Edit a user with error handling"""
     error_message = None
     
     try:
-        # Get the user using the manager
-        print(f"DEBUG: Calling User.objects().get(id={user_id})")
+        # Get the user
         user = User.objects().get(id=user_id)
         
         if not user:
-            print(f"DEBUG: User not found")
             return redirect('users')
         
-        print(f"DEBUG: Found user: {user.name}, {user.email}, {user.age}")
-        
         if request.method == 'POST':
-            print(f"DEBUG: POST request received")
-            # Update user data
-            user.name = request.POST.get('name', '').strip()
-            user.email = request.POST.get('email', '').strip()
-            
+            # Get form data
+            name = request.POST.get('name', '').strip()
+            email = request.POST.get('email', '').strip()
             age_str = request.POST.get('age', '').strip()
-            user.age = int(age_str) if age_str and age_str.isdigit() else None
             
-            print(f"DEBUG: Updated user data - name={user.name}, email={user.email}, age={user.age}")
+            # Basic validation
+            if not name:
+                error_message = "Name is required."
+            elif not email:
+                error_message = "Email is required."
+            elif '@' not in email:
+                error_message = "Please enter a valid email address."
             
-            # Save the changes
-            try:
-                user.save()
-                print(f"DEBUG: User saved")
-                return redirect('users')
-            except Exception as save_error:
-                print(f"DEBUG: Error saving user: {save_error}")
-                error_message = str(save_error)
+            if not error_message:
+                # Update user data
+                user.name = name
+                user.email = email
+                user.age = int(age_str) if age_str and age_str.isdigit() else None
+                
+                # Save with error handling
+                try:
+                    user.save()
+                    return redirect('users')
+                except ValueError as e:
+                    error_message = str(e)
+                except Exception as e:
+                    error_message = f"Error saving user: {str(e)}"
+            else:
+                # If validation failed, update the user object for the form
+                user.name = name
+                user.email = email
+                user.age = int(age_str) if age_str and age_str.isdigit() else None
         
-        print(f"DEBUG: Rendering edit form")
         return render(request, 'edit_user.html', {'user': user, 'error': error_message})
         
     except Exception as e:
-        print(f"DEBUG: Error editing user: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error editing user: {e}")
         return redirect('users')
 
 
