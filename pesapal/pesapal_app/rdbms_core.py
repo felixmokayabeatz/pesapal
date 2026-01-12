@@ -22,41 +22,60 @@ class DataType:
     
     @staticmethod
     def validate(data_type: str, value: Any) -> bool:
+        print(f"DEBUG DataType.validate: Checking type '{data_type}' for value '{value}' (type: {type(value)})")
+        
         if value is None:
+            print(f"DEBUG DataType.validate: Value is None, returning True")
             return True
         
         # Special handling for INTEGER type
         if data_type == DataType.INTEGER:
             # Allow integers, strings that can be converted to integers, or numeric strings
             if isinstance(value, int):
+                print(f"DEBUG DataType.validate: INTEGER - value is int: True")
                 return True
             elif isinstance(value, str):
                 # Check if it's a string that can be converted to int
                 if value.isdigit():
+                    print(f"DEBUG DataType.validate: INTEGER - string is digits: True")
                     return True
                 # Also check for negative numbers
                 if value.startswith('-') and value[1:].isdigit():
+                    print(f"DEBUG DataType.validate: INTEGER - string is negative digits: True")
                     return True
                 # Check if it's a string representation of a number
                 try:
                     int(value)
+                    print(f"DEBUG DataType.validate: INTEGER - string can be converted to int: True")
                     return True
                 except ValueError:
+                    print(f"DEBUG DataType.validate: INTEGER - string cannot be converted to int: False")
                     return False
             elif isinstance(value, float) and value.is_integer():
+                print(f"DEBUG DataType.validate: INTEGER - value is float but integer: True")
                 return True
+            print(f"DEBUG DataType.validate: INTEGER - all checks failed: False")
             return False
         
         elif data_type == DataType.TEXT:
-            return isinstance(value, str)
+            result = isinstance(value, str)
+            print(f"DEBUG DataType.validate: TEXT - is string: {result}")
+            return result
         elif data_type == DataType.REAL:
-            return isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit())
+            result = isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit())
+            print(f"DEBUG DataType.validate: REAL - is numeric: {result}")
+            return result
         elif data_type == DataType.BOOLEAN:
-            return isinstance(value, bool) or value in (0, 1, '0', '1', True, False, 'TRUE', 'FALSE', 'true', 'false')
+            result = isinstance(value, bool) or value in (0, 1, '0', '1', True, False, 'TRUE', 'FALSE', 'true', 'false')
+            print(f"DEBUG DataType.validate: BOOLEAN - is boolean: {result}")
+            return result
         elif data_type == DataType.DATE:
-            return isinstance(value, str)
+            result = isinstance(value, str)
+            print(f"DEBUG DataType.validate: DATE - is string: {result}")
+            return result
+        
+        print(f"DEBUG DataType.validate: Unknown data type '{data_type}', returning False")
         return False
-
 
 class Index:
     """Basic index implementation"""
@@ -265,6 +284,8 @@ class Database:
         
         if sql_upper.startswith("CREATE TABLE"):
             return self._parse_create_table(sql)
+        elif sql_upper.startswith("ALTER TABLE"):
+            return self._parse_alter_table(sql)  # NEW
         elif sql_upper.startswith("INSERT INTO"):
             return self._parse_insert(sql)
         elif sql_upper.startswith("SELECT"):
@@ -279,40 +300,169 @@ class Database:
             return self._parse_create_index(sql)
         else:
             raise ValueError(f"Unsupported SQL: {sql}")
+        
+    def _parse_alter_table(self, sql: str):
+        """Parse ALTER TABLE ADD COLUMN"""
+        pattern = r'ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(\w+)\s+(\w+)'
+        match = re.match(pattern, sql, re.IGNORECASE)
+        
+        if not match:
+            raise ValueError(f"Invalid ALTER TABLE: {sql}")
+        
+        table_name = match.group(1)
+        column_name = match.group(2)
+        column_type = match.group(3).upper()
+        
+        if table_name not in self.tables:
+            raise ValueError(f"Table {table_name} not found")
+        
+        table = self.tables[table_name]
+        
+        # Check if column already exists
+        for col in table.columns:
+            if col.name.lower() == column_name.lower():
+                raise ValueError(f"Column {column_name} already exists in {table_name}")
+        
+        # Create and add column
+        new_column = Column(column_name, column_type, False, False, True)
+        table.add_column(new_column)
+        
+        # Add null values to existing rows
+        for row in table.rows:
+            row[column_name] = None
+        
+        print(f"✓ Added column '{column_name}' to table '{table_name}'")
+        return True
     
     def _parse_create_table(self, sql: str):
-        pattern = r'CREATE TABLE (\w+)\s*\((.*)\)'
+        # Improved pattern to handle different CREATE TABLE formats
+        pattern = r'CREATE TABLE\s+(\w+)\s*\((.*)\)'
         match = re.match(pattern, sql, re.IGNORECASE | re.DOTALL)
+        
         if not match:
-            raise ValueError("Invalid CREATE TABLE")
+            raise ValueError(f"Invalid CREATE TABLE syntax: {sql}")
         
         table_name = match.group(1)
         columns_sql = match.group(2).strip()
         
+        print(f"DEBUG: Table name: {table_name}")
+        print(f"DEBUG: Columns SQL: {columns_sql}")
+        
         if table_name in self.tables:
-            raise ValueError(f"Table {table_name} exists")
+            raise ValueError(f"Table {table_name} already exists")
         
         columns = []
-        for col_def in columns_sql.split(','):
+        # Split by commas, but handle commas inside parentheses
+        column_defs = []
+        current_def = ""
+        paren_depth = 0
+        
+        for char in columns_sql:
+            if char == '(':
+                paren_depth += 1
+            elif char == ')':
+                paren_depth -= 1
+            elif char == ',' and paren_depth == 0:
+                column_defs.append(current_def.strip())
+                current_def = ""
+                continue
+            current_def += char
+        
+        if current_def.strip():
+            column_defs.append(current_def.strip())
+        
+        print(f"DEBUG: Column definitions: {column_defs}")
+        
+        for col_def in column_defs:
+            if not col_def:
+                continue
+                
             col_def = col_def.strip()
-            parts = col_def.split()
-            col_name = parts[0]  # Keep original case
+            print(f"DEBUG: Processing column: '{col_def}'")
             
-            # Get type - convert to uppercase for validation
-            col_type = parts[1].upper() if len(parts) > 1 else "TEXT"
+            # Split by spaces, but handle quoted names
+            parts = []
+            current_part = ""
+            in_quotes = False
+            in_parentheses = False
             
-            is_primary = "PRIMARY KEY" in col_def.upper()
-            is_unique = "UNIQUE" in col_def.upper()
-            nullable = "NOT NULL" not in col_def.upper()
+            for char in col_def:
+                if char == '"' or char == "'":
+                    in_quotes = not in_quotes
+                    current_part += char
+                elif char == '(' and not in_quotes:
+                    in_parentheses = True
+                    current_part += char
+                elif char == ')' and not in_quotes:
+                    in_parentheses = False
+                    current_part += char
+                elif char == ' ' and not in_quotes and not in_parentheses:
+                    if current_part:
+                        parts.append(current_part)
+                        current_part = ""
+                else:
+                    current_part += char
+            
+            if current_part:
+                parts.append(current_part)
+            
+            print(f"DEBUG: Column parts: {parts}")
+            
+            if len(parts) < 2:
+                raise ValueError(f"Invalid column definition: {col_def}")
+            
+            col_name = parts[0].strip('"').strip("'")
+            
+            # Parse data type - handle INT, INTEGER, TEXT, etc.
+            col_type = parts[1].upper()
+            
+            # Standardize data types
+            if col_type == "INT":
+                col_type = DataType.INTEGER
+            elif col_type == "VARCHAR" or col_type.startswith("VARCHAR"):
+                col_type = DataType.TEXT
+            elif col_type == "FLOAT" or col_type == "DOUBLE":
+                col_type = DataType.REAL
+            elif col_type == "BOOL":
+                col_type = DataType.BOOLEAN
+            
+            # Check for constraints
+            is_primary = False
+            is_unique = False
+            nullable = True
+            
+            for i in range(2, len(parts)):
+                constraint = parts[i].upper()
+                if constraint == "PRIMARY" and i + 1 < len(parts) and parts[i + 1].upper() == "KEY":
+                    is_primary = True
+                elif constraint == "PRIMARY_KEY":
+                    is_primary = True
+                elif constraint == "UNIQUE":
+                    is_unique = True
+                elif constraint == "NOT" and i + 1 < len(parts) and parts[i + 1].upper() == "NULL":
+                    nullable = False
+                elif constraint == "NOT_NULL":
+                    nullable = False
+            
+            print(f"DEBUG: Creating column: name={col_name}, type={col_type}, "
+                  f"primary={is_primary}, unique={is_unique}, nullable={nullable}")
             
             columns.append(Column(col_name, col_type, is_primary, is_unique, nullable))
         
+        # Create the table
         table = Table(table_name)
         for col in columns:
             table.add_column(col)
         
         self.tables[table_name] = table
-        return table
+        print(f"✓ Created table '{table_name}' with {len(columns)} columns")
+        
+        # Return schema info
+        return {
+            'table': table_name,
+            'columns': len(columns),
+            'schema': [{'name': col.name, 'type': col.data_type} for col in columns]
+        }
     
     def _parse_insert(self, sql: str) -> int:
         # Handle multi-line SQL
