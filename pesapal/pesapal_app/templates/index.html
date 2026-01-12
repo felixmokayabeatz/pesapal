@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pesapal RDBMS Demo</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
+        .card { background: white; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
+        .nav { margin: 20px 0; }
+        .nav a { margin-right: 15px; color: #3498db; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Custom RDBMS Demo</h1>
+            <p>Pesapal Junior Developer Challenge 2026</p>
+        </div>
+        
+        <div class="nav">
+            <a href="/" class="btn">Home</a>
+            <a href="/users/" class="btn">Users</a>
+            <a href="/products/" class="btn">Products</a>
+            <a href="/join/" class="btn">JOIN Demo</a>
+        </div>
+        
+        <div class="card">
+            <h2>Database: {{ database_name }}</h2>
+            <p>A custom-built relational database management system implemented in Python.</p>
+            
+            <h3>Database Schema</h3>
+            {% for table_name, table_info in tables.items %}
+            <h4>{{ table_name }} ({{ table_info.row_count }} rows)</h4>
+            <table>
+                <tr>
+                    <th>Column</th>
+                    <th>Type</th>
+                    <th>Constraints</th>
+                </tr>
+                {% for col in table_info.columns %}
+                <tr>
+                    <td>{{ col.name }}</td>
+                    <td>{{ col.type }}</td>
+                    <td>
+                        {% if col.primary %}PRIMARY KEY{% endif %}
+                        {% if col.unique %}UNIQUE{% endif %}
+                        {% if not col.nullable %}NOT NULL{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endfor %}
+        </div>
+        
+        <div class="card">
+            <h3>Execute SQL Query</h3>
+            <form id="queryForm">
+                {% csrf_token %}
+                <textarea id="query" rows="4" style="width: 100%; padding: 10px;" 
+                          placeholder="SELECT * FROM users"></textarea>
+                <button type="submit" class="btn">Execute</button>
+            </form>
+            <div id="result" style="margin-top: 20px;"></div>
+        </div>
+        
+        <div class="card">
+            <h3>Features Demonstrated</h3>
+            <ul>
+                <li>Custom RDBMS with SQL interface</li>
+                <li>Interactive REPL mode (run REPL separately)</li>
+                <li>CRUD operations (Create, Read, Update, Delete)</li>
+                <li>Primary keys and unique constraints</li>
+                <li>Basic indexing system</li>
+                <li>Table JOIN operations</li>
+                <li>Django web interface</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('queryForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const query = document.getElementById('query').value;
+            const resultDiv = document.getElementById('result');
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const response = await fetch('/api/query/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'query': query,
+                    'csrfmiddlewaretoken': csrfToken
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                resultDiv.innerHTML = '<pre>' + JSON.stringify(data.result, null, 2) + '</pre>';
+            } else {
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+            }
+        };
+    </script>
+</body>
+</html>

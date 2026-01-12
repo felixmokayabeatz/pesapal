@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Users</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn { display: inline-block; padding: 8px 16px; margin: 5px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; }
+        .btn-danger { background: #e74c3c; }
+        .btn-success { background: #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Users Management</h1>
+        <a href="/" class="btn">Home</a>
+        <a href="/users/add/" class="btn btn-success">Add New User</a>
+        
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Age</th>
+                <th>Actions</th>
+            </tr>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.age }}</td>
+                <td>
+                    <a href="/users/edit/{{ user.id }}/" class="btn">Edit</a>
+                    <a href="/users/delete/{{ user.id }}/" class="btn btn-danger" 
+                       onclick="return confirm('Delete this user?')">Delete</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No users found</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
