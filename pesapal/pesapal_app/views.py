@@ -81,29 +81,55 @@ def add_user(request):
 
 def edit_user(request, user_id):
     """Edit a user"""
-    users = User.objects().filter(id=user_id)
-    if not users:
+    print(f"DEBUG: edit_user called with user_id={user_id}")
+    
+    try:
+        # Get the user using the manager
+        print(f"DEBUG: Calling User.objects().get(id={user_id})")
+        user = User.objects().get(id=user_id)
+        
+        if not user:
+            print(f"DEBUG: User not found")
+            return redirect('users')
+        
+        print(f"DEBUG: Found user: {user.name}, {user.email}, {user.age}")
+        
+        if request.method == 'POST':
+            print(f"DEBUG: POST request received")
+            # Update user data
+            user.name = request.POST.get('name', '').strip()
+            user.email = request.POST.get('email', '').strip()
+            
+            age_str = request.POST.get('age', '').strip()
+            user.age = int(age_str) if age_str and age_str.isdigit() else None
+            
+            print(f"DEBUG: Updated user data - name={user.name}, email={user.email}, age={user.age}")
+            
+            # Save the changes
+            user.save()
+            print(f"DEBUG: User saved")
+            return redirect('users')
+        
+        print(f"DEBUG: Rendering edit form")
+        return render(request, 'edit_user.html', {'user': user})
+        
+    except Exception as e:
+        print(f"DEBUG: Error editing user: {e}")
+        import traceback
+        traceback.print_exc()
         return redirect('users')
-    
-    user = users[0]
-    
-    if request.method == 'POST':
-        user.name = request.POST.get('name')
-        user.email = request.POST.get('email')
-        user.age = request.POST.get('age')
-        user.save()
-        return redirect('users')
-    
-    return render(request, 'edit_user.html', {'user': user})
 
 
 def delete_user(request, user_id):
     """Delete a user"""
-    db = RDBMSWrapper.get_db()
-    db.execute_sql(f"DELETE FROM users WHERE id = {user_id}")
-
-    RDBMSWrapper.save_db()
-
+    try:
+        # Get the user and delete it
+        user = User.objects().get(id=user_id)
+        if user:
+            user.delete()
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+    
     return redirect('users')
 
 
