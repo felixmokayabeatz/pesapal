@@ -1,3 +1,4 @@
+# pesapal_app/rdbms_core.py
 """
 Simple RDBMS Implementation for Pesapal Challenge
 Author: [Your Name]
@@ -155,22 +156,22 @@ class Table:
     
     def _evaluate_where(self, row: Dict, where_clause: str) -> bool:
         try:
-            # Simple evaluator
-            expression = where_clause
+            # Make case-insensitive
+            expression = where_clause.upper()
+            
             for col_name, value in row.items():
                 if isinstance(value, str):
                     value_str = f"'{value}'"
                 else:
                     value_str = str(value)
-                # Replace column name in case-insensitive way
-                expression = re.sub(rf'(?i)\b{re.escape(col_name)}\b', value_str, expression)
+                
+                # Replace column name (case-insensitive)
+                col_name_upper = col_name.upper()
+                expression = re.sub(rf'\b{re.escape(col_name_upper)}\b', value_str, expression)
             
             expression = expression.replace('=', '==').replace('AND', 'and').replace('OR', 'or')
-            # Also handle lowercase and/or
-            expression = expression.replace('and', 'and').replace('or', 'or')
             return eval(expression, {"__builtins__": {}}, {})
-        except Exception as e:
-            print(f"DEBUG _evaluate_where error: {e}, expression={expression}")
+        except:
             return False
         
     
@@ -188,21 +189,22 @@ class Database:
         self.tables: Dict[str, Table] = {}
     
     def execute_sql(self, sql: str) -> Any:
-        sql = sql.strip().upper()
+        sql = self._clean_sql(sql)  # Clean first
+        sql_upper = sql.upper()  # Only uppercase for checking command type
         
-        if sql.startswith("CREATE TABLE"):
+        if sql_upper.startswith("CREATE TABLE"):
             return self._parse_create_table(sql)
-        elif sql.startswith("INSERT INTO"):
+        elif sql_upper.startswith("INSERT INTO"):
             return self._parse_insert(sql)
-        elif sql.startswith("SELECT"):
+        elif sql_upper.startswith("SELECT"):
             return self._parse_select(sql)
-        elif sql.startswith("UPDATE"):
+        elif sql_upper.startswith("UPDATE"):
             return self._parse_update(sql)
-        elif sql.startswith("DELETE"):
+        elif sql_upper.startswith("DELETE"):
             return self._parse_delete(sql)
-        elif sql.startswith("DROP TABLE"):
+        elif sql_upper.startswith("DROP TABLE"):
             return self._parse_drop_table(sql)
-        elif sql.startswith("CREATE INDEX"):
+        elif sql_upper.startswith("CREATE INDEX"):
             return self._parse_create_index(sql)
         else:
             raise ValueError(f"Unsupported SQL: {sql}")
@@ -223,8 +225,10 @@ class Database:
         for col_def in columns_sql.split(','):
             col_def = col_def.strip()
             parts = col_def.split()
-            col_name = parts[0]
-            col_type = parts[1].upper()
+            col_name = parts[0]  # Keep original case
+            
+            # Get type - convert to uppercase for validation
+            col_type = parts[1].upper() if len(parts) > 1 else "TEXT"
             
             is_primary = "PRIMARY KEY" in col_def.upper()
             is_unique = "UNIQUE" in col_def.upper()
@@ -240,10 +244,13 @@ class Database:
         return table
     
     def _parse_insert(self, sql: str) -> int:
+        # Handle multi-line SQL
+        sql = ' '.join(sql.replace('\n', ' ').split())
+        
         pattern = r'INSERT INTO (\w+)\s*\((.*?)\)\s*VALUES\s*\((.*)\)'
         match = re.match(pattern, sql, re.IGNORECASE)
         if not match:
-            raise ValueError("Invalid INSERT")
+            raise ValueError(f"Invalid INSERT: {sql}")
         
         table_name = match.group(1)
         columns_str = match.group(2)
@@ -254,6 +261,9 @@ class Database:
         
         columns = [col.strip() for col in columns_str.split(',')]
         values = self._parse_values(values_str)
+        
+        if len(columns) != len(values):
+            raise ValueError(f"Column count ({len(columns)}) doesn't match value count ({len(values)})")
         
         row_data = dict(zip(columns, values))
         return self.tables[table_name].insert(row_data)
@@ -310,7 +320,7 @@ class Database:
         pattern = r'UPDATE (\w+) SET (.*?)(?: WHERE (.*))?'
         match = re.match(pattern, sql, re.IGNORECASE)
         if not match:
-            raise ValueError("Invalid UPDATE")
+            raise ValueError(f"Invalid UPDATE: {sql}")
         
         table_name = match.group(1)
         set_clause = match.group(2)
@@ -321,8 +331,12 @@ class Database:
         
         updates = {}
         for assignment in set_clause.split(','):
-            col, value = assignment.split('=')
-            updates[col.strip()] = self._parse_value(value.strip())
+            assignment = assignment.strip()
+            if '=' in assignment:
+                col, value = assignment.split('=', 1)  # Split only on first '='
+                updates[col.strip()] = self._parse_value(value.strip())
+            else:
+                raise ValueError(f"Invalid assignment: {assignment}")
         
         return self.tables[table_name].update(updates, where_clause)
     
@@ -536,6 +550,11 @@ class Database:
             print(f"✗ Error loading database: {e}")
             return False
 
+    def _clean_sql(self, sql: str) -> str:
+        """Clean SQL by removing extra whitespace and newlines"""
+        # Replace newlines with spaces and normalize whitespace
+        sql = ' '.join(sql.replace('\n', ' ').split())
+        return sql.strip()
 
 class REPL:
     def __init__(self, db: Database):
