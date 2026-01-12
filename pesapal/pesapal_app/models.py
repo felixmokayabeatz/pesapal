@@ -5,15 +5,33 @@ from .rdbms_core import Database, Column, DataType
 
 
 class RDBMSWrapper:
-    """Wrapper to use our RDBMS with Django"""
     _instance = None
     
     @classmethod
     def get_db(cls):
         if cls._instance is None:
             cls._instance = Database("pesapal_db")
-            cls._init_sample_data(cls._instance)
+            
+            # Try to load from file
+            if cls._instance.load_from_file():
+                print("Loaded database from db.pesapal")
+            else:
+                # If no file exists, create sample data
+                cls._init_sample_data(cls._instance)
+                print("Created new database")
+                
+                # Save the new database
+                cls._instance.save_to_file()
+        
         return cls._instance
+    
+    @classmethod
+    def save_db(cls):
+        """Save database to file"""
+        if cls._instance:
+            cls._instance.save_to_file()
+            return True
+        return False
     
     @classmethod
     def _init_sample_data(cls, db):
@@ -60,14 +78,17 @@ class RDBMSWrapper:
             pass
 
 
-# Django model-like classes that use our RDBMS
 class User:
-    def __init__(self, id=None, name=None, email=None, age=None, created_at=None):
-        self.id = id
-        self.name = name
-        self.email = email
-        self.age = age
-        self.created_at = created_at
+    def __init__(self, id=None, ID=None, name=None, NAME=None, email=None, EMAIL=None, 
+                 age=None, AGE=None, created_at=None, CREATED_AT=None, _id=None):
+        # Handle all possible column name variations
+        self.id = id or ID or _id
+        self.name = name or NAME
+        self.email = email or EMAIL
+        self.age = age or AGE
+        self.created_at = created_at or CREATED_AT
+    
+    # ... rest of the class stays the same
     
     @classmethod
     def objects(cls):
@@ -97,40 +118,50 @@ class User:
         return f"User: {self.name} ({self.email})"
 
 
+# In the UserManager class, fix the all() method:
+
 class UserManager:
     def all(self):
         db = RDBMSWrapper.get_db()
         results = db.execute_sql("SELECT * FROM users")
-        return [User(**row) for row in results]
-    
-    def filter(self, **kwargs):
-        db = RDBMSWrapper.get_db()
-        where_parts = []
-        for key, value in kwargs.items():
-            if isinstance(value, str):
-                where_parts.append(f"{key} = '{value}'")
-            else:
-                where_parts.append(f"{key} = {value}")
         
-        where_clause = " AND ".join(where_parts) if where_parts else "1=1"
-        sql = f"SELECT * FROM users WHERE {where_clause}"
-        results = db.execute_sql(sql)
-        return [User(**row) for row in results]
-    
-    def get(self, **kwargs):
-        results = self.filter(**kwargs)
-        if results:
-            return results[0]
-        return None
-
+        # Convert results to User objects, handling all column name variations
+        users = []
+        for row in results:
+            # Create a dictionary with lowercase keys
+            user_data = {}
+            for key, value in row.items():
+                # Convert any key to lowercase for consistency
+                lower_key = key.lower().replace('_', '')
+                user_data[lower_key] = value
+            
+            # Also handle the original keys
+            user_data.update(row)
+            
+            try:
+                user = User(**user_data)
+                users.append(user)
+            except Exception as e:
+                # Fallback: create User with extracted values
+                user = User()
+                user.id = row.get('ID') or row.get('id') or row.get('_id')
+                user.name = row.get('NAME') or row.get('name')
+                user.email = row.get('EMAIL') or row.get('email')
+                user.age = row.get('AGE') or row.get('age')
+                user.created_at = row.get('CREATED_AT') or row.get('created_at') or row.get('createdat')
+                users.append(user)
+        
+        return users
 
 class Product:
-    def __init__(self, id=None, name=None, price=None, in_stock=None, category=None):
-        self.id = id
-        self.name = name
-        self.price = price
-        self.in_stock = in_stock
-        self.category = category
+    def __init__(self, id=None, ID=None, name=None, NAME=None, price=None, PRICE=None, 
+                 in_stock=None, IN_STOCK=None, category=None, CATEGORY=None, _id=None):
+        # Handle all possible column name variations
+        self.id = id or ID or _id
+        self.name = name or NAME
+        self.price = price or PRICE
+        self.in_stock = in_stock or IN_STOCK
+        self.category = category or CATEGORY
     
     @classmethod
     def objects(cls):
@@ -140,22 +171,37 @@ class Product:
         return f"Product: {self.name} (${self.price})"
 
 
+
+    
+    # ... rest of the methods stay the same
+
+# Also update ProductManager similarly:
 class ProductManager:
     def all(self):
         db = RDBMSWrapper.get_db()
         results = db.execute_sql("SELECT * FROM products")
-        return [Product(**row) for row in results]
-    
-    def filter(self, **kwargs):
-        db = RDBMSWrapper.get_db()
-        where_parts = []
-        for key, value in kwargs.items():
-            if isinstance(value, str):
-                where_parts.append(f"{key} = '{value}'")
-            else:
-                where_parts.append(f"{key} = {value}")
         
-        where_clause = " AND ".join(where_parts) if where_parts else "1=1"
-        sql = f"SELECT * FROM products WHERE {where_clause}"
-        results = db.execute_sql(sql)
-        return [Product(**row) for row in results]
+        products = []
+        for row in results:
+            # Create a dictionary with lowercase keys
+            product_data = {}
+            for key, value in row.items():
+                lower_key = key.lower().replace('_', '')
+                product_data[lower_key] = value
+            
+            product_data.update(row)
+            
+            try:
+                product = Product(**product_data)
+                products.append(product)
+            except Exception as e:
+                # Fallback
+                product = Product()
+                product.id = row.get('ID') or row.get('id') or row.get('_id')
+                product.name = row.get('NAME') or row.get('name')
+                product.price = row.get('PRICE') or row.get('price')
+                product.in_stock = row.get('IN_STOCK') or row.get('in_stock') or row.get('instock')
+                product.category = row.get('CATEGORY') or row.get('category')
+                products.append(product)
+        
+        return products
