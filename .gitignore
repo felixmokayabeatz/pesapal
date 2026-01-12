@@ -1,0 +1,11 @@
+pesapal_v_env/
+db.sqlite3
+*.pyc
+__pycache__
+__pycache__/
+.env.prod
+.env.dev
+local.py
+staticfiles/
+reminders.log
+/logs
