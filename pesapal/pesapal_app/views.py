@@ -54,6 +54,11 @@ def users_view(request):
             'created_at': user.created_at or ''
         })
     
+    # Debug: Print what we're getting
+    print(f"DEBUG users_view: Processing {len(user_list)} users")
+    for i, user in enumerate(user_list):
+        print(f"DEBUG users_view: User {i+1}: id={user['id']}, name={user['name']}, email={user['email']}, age={user['age']}")
+    
     # Calculate average age for stats
     ages = [u['age'] for u in user_list if u['age'] and str(u['age']).isdigit()]
     avg_age = sum(int(age) for age in ages) // len(ages) if ages else 0
@@ -67,50 +72,42 @@ def users_view(request):
 def add_user(request):
     """Add a new user"""
     if request.method == 'POST':
-        name = request.POST.get('name')
-        email = request.POST.get('email')
-        age = request.POST.get('age')
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        age_str = request.POST.get('age', '').strip()
         
         db = RDBMSWrapper.get_db()
         
         try:
-            # Get next ID
-            result = db.execute_sql("SELECT MAX(id) as max_id FROM users")
-            max_id = 0
-            if result and isinstance(result, list) and len(result) > 0:
-                max_id_dict = result[0]
-                max_id = max_id_dict.get('max_id', 0) or 0
-                if isinstance(max_id, str) and max_id.isdigit():
-                    max_id = int(max_id)
+            # Prepare values
+            email_value = f"'{email}'" if email else "NULL"
             
-            new_id = max_id + 1 if max_id else 1
-            
-            # Prepare age value
-            if age and age.isdigit():
-                age_value = int(age)
+            if age_str and age_str.isdigit():
+                age_value = int(age_str)
             else:
                 age_value = "NULL"
             
-            # Simple single-line INSERT
-            sql = f"INSERT INTO users (id, name, email, age, created_at) VALUES ({new_id}, '{name}', '{email}', {age_value}, '2024-01-15')"
+            # CRITICAL: Don't include ID, let RDBMS auto-generate it
+            # Also use proper SQL formatting
+            sql = f"INSERT INTO users (name, email, age, created_at) VALUES ('{name}', {email_value}, {age_value}, '2024-01-15')"
             
-            print(f"DEBUG add_user: Executing SQL: {sql}")
-            db.execute_sql(sql)
+            print(f"DEBUG add_user SQL: {sql}")
+            result = db.execute_sql(sql)
+            print(f"DEBUG add_user result: {result}")
             RDBMSWrapper.save_db()
             
-            print(f"✓ User added with id={new_id}")
+            print(f"✓ User added: name='{name}', email='{email}', age={age_str}")
             return redirect('users')
             
         except Exception as e:
             print(f"✗ Error in add_user: {e}")
             import traceback
             traceback.print_exc()
-            # Return to form with error
             return render(request, 'add_user.html', {
                 'error': str(e),
                 'name': name,
                 'email': email,
-                'age': age
+                'age': age_str
             })
     
     return render(request, 'add_user.html')
@@ -119,6 +116,8 @@ def add_user(request):
 def edit_user(request, user_id):
     """Edit a user"""
     print(f"DEBUG: edit_user called with user_id={user_id}")
+    
+    error_message = None
     
     try:
         # Get the user using the manager
@@ -143,12 +142,16 @@ def edit_user(request, user_id):
             print(f"DEBUG: Updated user data - name={user.name}, email={user.email}, age={user.age}")
             
             # Save the changes
-            user.save()
-            print(f"DEBUG: User saved")
-            return redirect('users')
+            try:
+                user.save()
+                print(f"DEBUG: User saved")
+                return redirect('users')
+            except Exception as save_error:
+                print(f"DEBUG: Error saving user: {save_error}")
+                error_message = str(save_error)
         
         print(f"DEBUG: Rendering edit form")
-        return render(request, 'edit_user.html', {'user': user})
+        return render(request, 'edit_user.html', {'user': user, 'error': error_message})
         
     except Exception as e:
         print(f"DEBUG: Error editing user: {e}")
@@ -205,12 +208,30 @@ def add_product(request):
         category = request.POST.get('category')
         
         db = RDBMSWrapper.get_db()
-        db.execute_sql(f"""
-            INSERT INTO products (name, price, in_stock, category) 
-            VALUES ('{name}', {price}, {in_stock}, '{category}')
-        """)
-        RDBMSWrapper.save_db()
-        return redirect('products')
+        
+        try:
+            # Convert in_stock to SQL boolean
+            in_stock_val = 'TRUE' if in_stock else 'FALSE'
+            
+            # Don't include ID - let it auto-generate
+            sql = f"INSERT INTO products (name, price, in_stock, category) VALUES ('{name}', {price}, {in_stock_val}, '{category}')"
+            
+            print(f"DEBUG add_product: Executing SQL: {sql}")
+            db.execute_sql(sql)
+            RDBMSWrapper.save_db()
+            return redirect('products')
+            
+        except Exception as e:
+            print(f"Error adding product: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return with error
+            return render(request, 'add_product.html', {
+                'error': str(e),
+                'name': name,
+                'price': price,
+                'category': category
+            })
     
     return render(request, 'add_product.html')
 

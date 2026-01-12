@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .test import test_db_columns
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -13,4 +14,6 @@ urlpatterns = [
     path('api/schema/', views.api_schema, name='api_schema'),
     path('join/', views.run_join, name='join_demo'),
     path('terminal/', views.web_terminal, name='terminal'),
+
+    path('test-columns/', test_db_columns, name='test_columns'),
 ]
