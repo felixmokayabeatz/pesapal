@@ -4,7 +4,7 @@ This is a **Simple Custom Relational Database Management System (RDBMS)** writte
 
 > - Main purpose of this project is to showcase the custom RDBMS and the web app to access it.
 
-It stores data in a file named **db.pesapal** when you start the app.
+It stores data in a file named **db.pesapal** which is automatically created when you start the app.
 
 ---
 
